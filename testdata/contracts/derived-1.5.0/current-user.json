@@ -1,0 +1,29 @@
+{
+  "source": "derived",
+  "client_version": "1.5.0",
+  "ref": "flutter/lib/models/user_model.dart refreshCurrentUser",
+  "method": "POST",
+  "path": "/api/currentUser",
+  "headers": {
+    "Authorization": "Bearer [redacted]"
+  },
+  "body": {
+    "id": "123456789",
+    "uuid": "ZmFrZS11dWlk"
+  },
+  "response": {
+    "name": "alice",
+    "display_name": "Alice",
+    "avatar": "",
+    "email": "alice@example.com",
+    "note": "",
+    "status": 1,
+    "info": {
+      "email_verification": false,
+      "email_alarm_notification": false,
+      "login_device_whitelist": [],
+      "other": {}
+    },
+    "is_admin": false
+  }
+}

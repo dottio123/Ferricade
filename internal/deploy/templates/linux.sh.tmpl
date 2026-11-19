@@ -1,0 +1,155 @@
+#!/bin/sh
+# ferricade RustDesk deployment; run as root.
+{{if .Latest}}# Exit codes: 10 elevation, 20 download or checksum, 21 latest release lookup,
+# 30 install or service, 40 configuration.
+{{end}}if [ "$(id -u)" -ne 0 ]; then exit 10; fi
+mkdir -p /var/log || exit 30
+log_file=/var/log/ferricade-deploy.log
+log_step() { printf '%s %s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$1" >> "$log_file"; }
+fail() { log_step "$2"; exit "$1"; }
+log_step 'Preflight completed'
+exe=/usr/bin/rustdesk
+{{if .Install}}
+{{if .Latest}}latest_lookup_ok=1
+target_version=
+if command -v curl >/dev/null 2>&1; then
+  redirect=$(curl -fsS -o /dev/null -w '%{redirect_url}' 'https://github.com/rustdesk/rustdesk/releases/latest') || latest_lookup_ok=0
+  if [ "$latest_lookup_ok" -eq 1 ]; then
+    case $redirect in
+      https://github.com/rustdesk/rustdesk/releases/tag/*) target_version=${redirect##*/} ;;
+      *) latest_lookup_ok=0 ;;
+    esac
+    target_version=$(printf '%s' "$target_version" | tr -d '\015')
+  fi
+elif command -v wget >/dev/null 2>&1; then
+  release_json=$(wget -qO- 'https://api.github.com/repos/rustdesk/rustdesk/releases/latest') || latest_lookup_ok=0
+  if [ "$latest_lookup_ok" -eq 1 ]; then
+    target_version=$(printf '%s\n' "$release_json" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | sed -n '1p')
+  fi
+else latest_lookup_ok=0; fi
+if [ "$latest_lookup_ok" -eq 1 ]; then
+  case $target_version in
+    *[!0-9.]*|'') latest_lookup_ok=0 ;;
+    *) printf '%s\n' "$target_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || latest_lookup_ok=0 ;;
+  esac
+fi
+if [ "$latest_lookup_ok" -eq 1 ]; then
+  log_step "Latest RustDesk release: $target_version"
+elif [ -x "$exe" ]; then
+  log_step 'Latest release lookup failed; keeping the installed version'
+else
+  fail 21 'Could not determine the latest RustDesk release'
+fi
+if [ "$latest_lookup_ok" -eq 1 ]; then
+{{end}}log_step 'Install check started'
+need_install=1
+if [ -x "$exe" ]; then
+  current_version=$($exe --version 2>/dev/null || true)
+  if [ "$current_version" = {{if .Latest}}"$target_version"{{else}}{{q .Version}}{{end}} ]; then need_install=0; fi
+  {{if not .AllowDowngrade}}if [ "$need_install" -eq 1 ] && printf '%s\n' "$current_version" | awk -F. -v target={{if .Latest}}"$target_version"{{else}}{{q .Version}}{{end}} 'BEGIN { split(target,t,".") } NF==3 && $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ && $3 ~ /^[0-9]+$/ { if ($1+0>t[1]+0 || ($1+0==t[1]+0 && $2+0>t[2]+0) || ($1+0==t[1]+0 && $2+0==t[2]+0 && $3+0>t[3]+0)) exit 0 } { exit 1 }'; then
+    need_install=0
+    log_step 'Newer installed version retained'
+  fi{{end}}
+fi
+if [ "$need_install" -eq 1 ]; then
+  if command -v apt-get >/dev/null 2>&1; then
+    url={{if .Latest}}"https://github.com/rustdesk/rustdesk/releases/download/$target_version/rustdesk-$target_version-x86_64.deb"{{else}}{{q .URLDeb}}{{end}}
+    checksum={{q .SHADeb}}
+    suffix=deb
+    installer=apt
+  elif command -v dnf >/dev/null 2>&1 || command -v rpm >/dev/null 2>&1; then
+    url={{if .Latest}}"https://github.com/rustdesk/rustdesk/releases/download/$target_version/rustdesk-$target_version-0.x86_64.rpm"{{else}}{{q .URLRPM}}{{end}}
+    checksum={{q .SHARPM}}
+    suffix=rpm
+    installer=rpm
+  else fail 30 'No supported package manager'; fi
+  [ -n "$url" ] || fail 20 'Installer URL missing'
+  tmpdir=$(mktemp -d /tmp/ferricade-rustdesk.XXXXXX) || fail 20 'Temporary installer directory failed'
+  chmod 0755 "$tmpdir" || fail 20 'Temporary installer permissions failed'
+  file="$tmpdir/pkg.$suffix"
+  trap 'rm -rf "$tmpdir"' 0 HUP INT TERM
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$url" -o "$file" || fail 20 'Installer download failed'
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q "$url" -O "$file" || fail 20 'Installer download failed'
+  else fail 20 'No downloader available'; fi
+  chmod 0644 "$file" || fail 20 'Installer permissions failed'
+  if [ -n "$checksum" ]; then
+    if command -v sha256sum >/dev/null 2>&1; then actual=$(sha256sum "$file" | cut -d ' ' -f 1)
+    elif command -v shasum >/dev/null 2>&1; then actual=$(shasum -a 256 "$file" | cut -d ' ' -f 1)
+    else fail 20 'Checksum tool missing'; fi
+    [ "$actual" = "$(printf '%s' "$checksum" | tr 'A-F' 'a-f')" ] || fail 20 'Installer checksum mismatch'
+  fi
+  if [ "$installer" = apt ]; then apt-get install -y "$file" >/dev/null 2>&1 || fail 30 'Installer failed'
+  elif command -v dnf >/dev/null 2>&1; then dnf install -y "$file" >/dev/null 2>&1 || fail 30 'Installer failed'
+  else rpm -U "$file" >/dev/null 2>&1 || fail 30 'Installer failed'; fi
+  rm -f "$file"
+  trap - 0 HUP INT TERM
+  [ -x "$exe" ] || fail 30 'Installed executable missing'
+  service_restarted=0
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload || fail 30 'RustDesk service did not start'
+    systemctl enable rustdesk || fail 30 'RustDesk service did not start'
+    systemctl restart rustdesk || fail 30 'RustDesk service did not start'
+    service_active=0
+    for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+      sleep 1
+      if systemctl is-active --quiet rustdesk; then service_active=1; break; fi
+    done
+    [ "$service_active" -eq 1 ] || fail 30 'RustDesk service did not start'
+    service_restarted=1
+  else
+    log_step 'No systemd: service not restarted'
+  fi
+  installed_version=$("$exe" --version 2>/dev/null || true)
+  [ "$installed_version" = {{if .Latest}}"$target_version"{{else}}{{q .Version}}{{end}} ] || fail 30 "Installed version is $installed_version, expected {{if .Latest}}$target_version{{else}}{{.Version}}{{end}}"
+  if [ "$service_restarted" -eq 1 ]; then log_step 'RustDesk service restarted'; fi
+fi
+log_step 'Install check completed'
+{{if .Latest}}fi
+{{end}}{{end}}
+[ -x "$exe" ] || fail 30 'RustDesk executable missing'
+"$exe" --config {{q .ServerConfig}} >/dev/null 2>&1 || fail 40 'Server configuration failed'
+readback=$("$exe" --option 'custom-rendezvous-server' 2>/dev/null) || fail 40 'Server readback failed'
+[ "$readback" = {{q .ServerHost}} ] || fail 40 'Server verification failed'
+readback=$("$exe" --option 'key' 2>/dev/null) || fail 40 'Server key verification failed'
+if [ "$readback" != {{q .Key}} ]; then
+  "$exe" --option 'key' {{q .Key}} >/dev/null 2>&1 || fail 40 'Server key verification failed'
+  readback=$("$exe" --option 'key' 2>/dev/null) || fail 40 'Server key verification failed'
+  [ "$readback" = {{q .Key}} ] || fail 40 'Server key verification failed'
+fi
+{{if .Relay}}readback=$("$exe" --option 'relay-server' 2>/dev/null) || fail 40 'Relay verification failed'
+if [ "$readback" != {{q .Relay}} ]; then
+  "$exe" --option 'relay-server' {{q .Relay}} >/dev/null 2>&1 || fail 40 'Relay verification failed'
+  readback=$("$exe" --option 'relay-server' 2>/dev/null) || fail 40 'Relay verification failed'
+  [ "$readback" = {{q .Relay}} ] || fail 40 'Relay verification failed'
+fi
+{{end}}log_step 'Server configuration completed'
+{{if .Password}}
+out=$("$exe" --password {{q .Password}} 2>/dev/null) || fail 40 'Password configuration failed'
+case $out in *'Done!'*) ;; *) fail 40 'Password configuration failed' ;; esac
+log_step 'Password configuration completed'
+{{else if .ClearPassword}}
+out=$("$exe" --password '' 2>/dev/null) || fail 40 'Password removal failed'
+case $out in *'Done!'*) ;; *) fail 40 'Password removal failed' ;; esac
+log_step 'Password removal completed'
+{{end}}
+{{range .Settings}}
+"$exe" --option {{q .Key}} {{q .Value}} >/dev/null 2>&1 || fail 40 'Option configuration failed'
+readback=$("$exe" --option {{q .Key}} 2>/dev/null) || fail 40 'Option readback failed'
+[ "$readback" = {{q .Value}} ] || fail 40 'Option verification failed'
+log_step 'Option configuration completed'
+{{end}}
+{{if .PIN}}
+out=$("$exe" --set-unlock-pin {{q .PIN}} 2>/dev/null) || fail 40 'Unlock PIN configuration failed'
+case $out in *'Done!'*) ;; *) fail 40 'Unlock PIN configuration failed' ;; esac
+log_step 'Unlock PIN configuration completed'
+{{else if .ClearPIN}}
+out=$("$exe" --set-unlock-pin '' 2>/dev/null) || fail 40 'Unlock PIN removal failed'
+case $out in *'Done!'*) ;; *) fail 40 'Unlock PIN removal failed' ;; esac
+log_step 'Unlock PIN removal completed'
+{{end}}
+device_id=$("$exe" --get-id 2>/dev/null || true)
+if [ -n "$device_id" ]; then printf '%s\n' "$device_id"; else log_step 'Device ID unavailable'; fi
+log_step 'Deployment completed'
+exit 0

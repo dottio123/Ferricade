@@ -1,0 +1,22 @@
+{
+  "source": "derived",
+  "client_version": "1.5.0",
+  "ref": "src/hbbs_http/account.rs OidcSession::auth",
+  "method": "POST",
+  "path": "/api/oidc/auth",
+  "body": {
+    "op": "authentik",
+    "id": "123456789",
+    "uuid": "ZmFrZS11dWlk",
+    "deviceInfo": {
+      "os": "windows",
+      "type": "client",
+      "name": "pc1"
+    },
+    "apiDomain": "http://admin.example.com:21114"
+  },
+  "response": {
+    "code": "c0de",
+    "url": "https://admin.example.com/oidc/start?code=c0de"
+  }
+}

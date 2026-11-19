@@ -1,0 +1,150 @@
+# ferricade RustDesk deployment; run in Windows PowerShell 5.1 as administrator or SYSTEM.
+{{if .Latest}}# Exit codes: 10 elevation, 20 download or checksum, 21 latest release lookup,
+# 30 install or service, 40 configuration, 50 existing EXE installation.
+{{end}}$ErrorActionPreference = 'Stop'
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { exit 10 }
+$logDir = Join-Path $env:ProgramData 'ferricade'
+New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+$logFile = Join-Path $logDir 'deploy.log'
+function Log-Step([string]$message) { Add-Content -LiteralPath $logFile -Value ((Get-Date).ToUniversalTime().ToString('o') + ' ' + $message) }
+function Fail([int]$code, [string]$message) { Log-Step $message; exit $code }
+$uninstallKey = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\RustDesk'
+$installed = Get-ItemProperty -LiteralPath $uninstallKey -ErrorAction SilentlyContinue
+$msi = Get-ItemProperty 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*', 'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'RustDesk*' -and $_.WindowsInstaller -eq 1 } | Select-Object -First 1
+if ($installed -and -not $msi) { Fail 50 'Existing EXE installation; no changes made' }
+$exe = Join-Path $env:ProgramFiles 'RustDesk\rustdesk.exe'
+if ($installed -and $installed.InstallLocation) { $exe = Join-Path $installed.InstallLocation 'rustdesk.exe' }
+function Run-Client([string[]]$clientArgs) {
+    $ErrorActionPreference = 'Continue'
+    $output = (& $exe @clientArgs 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0) { throw 'RustDesk command failed' }
+    return $output
+}
+function Run-ClientRaw([string]$arguments) {
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $exe
+    $psi.Arguments = $arguments
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $p = [System.Diagnostics.Process]::Start($psi)
+    $stderr = $p.StandardError.ReadToEndAsync()
+    $out = $p.StandardOutput.ReadToEnd()
+    $p.WaitForExit()
+    $null = $stderr.Result
+    if ($p.ExitCode -ne 0) { throw 'RustDesk command failed' }
+    return $out.Trim()
+}
+{{if .Install}}
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+{{if .Latest}}
+$latestLookupOk = $false
+$response = $null
+try {
+    $request = [Net.HttpWebRequest]::Create('https://github.com/rustdesk/rustdesk/releases/latest')
+    $request.AllowAutoRedirect = $false
+    $request.Method = 'HEAD'
+    $request.UserAgent = 'ferricade'
+    try { $response = $request.GetResponse() }
+    catch [Net.WebException] {
+        if ($_.Exception.Response) { $response = $_.Exception.Response }
+        else { throw }
+    }
+    if ([int]$response.StatusCode -lt 300 -or [int]$response.StatusCode -ge 400) { throw 'Unexpected release response' }
+    $location = $response.Headers['Location']
+    if (-not $location -or -not $location.StartsWith('https://github.com/rustdesk/rustdesk/releases/tag/', [StringComparison]::Ordinal)) { throw 'Unexpected release location' }
+    $targetVersion = ($location -split '/')[-1].TrimEnd([char]13)
+    if ($targetVersion -cnotmatch '\A[0-9]+\.[0-9]+\.[0-9]+\z') { throw 'Invalid release version' }
+    $latestLookupOk = $true
+    Log-Step ('Latest RustDesk release: ' + $targetVersion)
+} catch {
+    if (Test-Path -LiteralPath $exe) { Log-Step 'Latest release lookup failed; keeping the installed version' }
+    else { Fail 21 'Could not determine the latest RustDesk release' }
+} finally {
+    if ($response) { $response.Close() }
+}
+if ($latestLookupOk) {
+{{end}}Log-Step 'Install check started'
+$needInstall = $true
+if (Test-Path -LiteralPath $exe) {
+    try { $currentVersion = Run-Client @('--version') }
+    catch { $currentVersion = [string]::Empty; Log-Step 'Installed version unreadable' }
+    if ($currentVersion -eq {{if .Latest}}$targetVersion{{else}}{{q .Version}}{{end}}) { $needInstall = $false }
+    elseif (-not {{if .AllowDowngrade}}$true{{else}}$false{{end}} -and $currentVersion -match '^\d+\.\d+\.\d+$' -and [version]$currentVersion -gt [version]{{if .Latest}}$targetVersion{{else}}{{q .Version}}{{end}}) { $needInstall = $false; Log-Step 'Newer installed version retained' }
+}
+if ($needInstall) {
+    $url = {{if .Latest}}'https://github.com/rustdesk/rustdesk/releases/download/' + $targetVersion + '/rustdesk-' + $targetVersion + '-x86_64.msi'{{else}}{{q .URLWindows}}{{end}}
+    $file = Join-Path $env:TEMP ('ferricade-rustdesk-' + [guid]::NewGuid().ToString('N') + '.msi')
+    try {
+        if ($url -match '^\\\\') { Copy-Item -LiteralPath $url -Destination $file -Force }
+        else { Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing }
+{{if .SHAWindows}}        if ((Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash -ine {{q .SHAWindows}}) { Fail 20 'Installer checksum mismatch' }{{end}}
+    } catch { Fail 20 'Installer download failed' }
+    $process = Start-Process -FilePath 'msiexec.exe' -ArgumentList @('/i', ('"' + $file + '"'), '/qn', '/norestart') -Wait -PassThru
+    if ($process.ExitCode -ne 0 -and $process.ExitCode -ne 3010 -and $process.ExitCode -ne 1641) { Fail 30 'Installer failed' }
+    Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
+    $installed = Get-ItemProperty -LiteralPath $uninstallKey -ErrorAction SilentlyContinue
+    if ($installed -and $installed.InstallLocation) { $exe = Join-Path $installed.InstallLocation 'rustdesk.exe' }
+    if (-not (Test-Path -LiteralPath $exe)) { Fail 30 'Installed executable missing' }
+    try {
+        $service = Get-Service -Name RustDesk -ErrorAction SilentlyContinue
+        if ($service -and $service.Status -eq 'Running') { Restart-Service -Name RustDesk -Force }
+        else { Start-Service -Name RustDesk }
+    } catch { Fail 30 'RustDesk service did not start' }
+    $serviceRunning = $false
+    for ($attempt = 0; $attempt -lt 15; $attempt++) {
+        Start-Sleep -Seconds 1
+        if ((Get-Service -Name RustDesk -ErrorAction SilentlyContinue).Status -eq 'Running') { $serviceRunning = $true; break }
+    }
+    if (-not $serviceRunning) { Fail 30 'RustDesk service did not start' }
+    try { $installedVersion = Run-Client @('--version') }
+    catch { $installedVersion = [string]::Empty }
+    if ($installedVersion -ne {{if .Latest}}$targetVersion{{else}}{{q .Version}}{{end}}) { Fail 30 ('Installed version is ' + $installedVersion + ', expected ' + {{if .Latest}}$targetVersion{{else}}{{q .Version}}{{end}}) }
+    Log-Step 'RustDesk service restarted'
+}
+Log-Step 'Install check completed'
+{{if .Latest}}}
+{{end}}{{end}}
+if (-not (Test-Path -LiteralPath $exe)) { Fail 30 'RustDesk executable missing' }
+try {
+    $null = Run-Client @('--config', {{q .ServerConfig}})
+    if ((Run-Client @('--option', 'custom-rendezvous-server')) -ne {{q .ServerHost}}) { Fail 40 'Server configuration verification failed' }
+} catch { Fail 40 'Server configuration failed' }
+try {
+    if ((Run-Client @('--option', 'key')) -cne {{q .Key}}) {
+        $null = Run-Client @('--option', 'key', {{q .Key}})
+        if ((Run-Client @('--option', 'key')) -cne {{q .Key}}) { Fail 40 'Server key verification failed' }
+    }
+} catch { Fail 40 'Server key verification failed' }
+{{if .Relay}}try {
+    if ((Run-Client @('--option', 'relay-server')) -cne {{q .Relay}}) {
+        $null = Run-Client @('--option', 'relay-server', {{q .Relay}})
+        if ((Run-Client @('--option', 'relay-server')) -cne {{q .Relay}}) { Fail 40 'Relay verification failed' }
+    }
+} catch { Fail 40 'Relay verification failed' }
+{{end}}Log-Step 'Server configuration completed'
+{{if .Password}}
+try { if (-not ((Run-Client @('--password', {{q .Password}})) -like '*Done!*')) { Fail 40 'Password configuration failed' } } catch { Fail 40 'Password configuration failed' }
+Log-Step 'Password configuration completed'
+{{else if .ClearPassword}}
+try { if (-not ((Run-ClientRaw '--password ""') -like '*Done!*')) { Fail 40 'Password removal failed' } } catch { Fail 40 'Password removal failed' }
+Log-Step 'Password removal completed'
+{{end}}
+{{range .Settings}}
+try {
+    $null = Run-Client @('--option', {{q .Key}}, {{q .Value}})
+    if ((Run-Client @('--option', {{q .Key}})) -ne {{q .Value}}) { Fail 40 'Option verification failed' }
+} catch { Fail 40 'Option configuration failed' }
+Log-Step 'Option configuration completed'
+{{end}}
+{{if .PIN}}
+try { if (-not ((Run-Client @('--set-unlock-pin', {{q .PIN}})) -like '*Done!*')) { Fail 40 'Unlock PIN configuration failed' } } catch { Fail 40 'Unlock PIN configuration failed' }
+Log-Step 'Unlock PIN configuration completed'
+{{else if .ClearPIN}}
+try { if (-not ((Run-ClientRaw '--set-unlock-pin ""') -like '*Done!*')) { Fail 40 'Unlock PIN removal failed' } } catch { Fail 40 'Unlock PIN removal failed' }
+Log-Step 'Unlock PIN removal completed'
+{{end}}
+try { $deviceId = Run-Client @('--get-id') } catch { $deviceId = $null }
+if ($deviceId) { Write-Output $deviceId } else { Log-Step 'Device ID unavailable' }
+Log-Step 'Deployment completed'
+exit 0

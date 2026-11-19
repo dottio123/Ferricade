@@ -1,0 +1,19 @@
+{
+  "source": "derived",
+  "client_version": "1.5.0",
+  "ref": "src/hbbs_http/sync.rs + src/common.rs get_sysinfo",
+  "method": "POST",
+  "path": "/api/sysinfo",
+  "body": {
+    "cpu": "Intel(R) Core(TM) i5, 3.1GHz, 8/4 cores",
+    "memory": "15.9GB",
+    "os": "windows / Windows 11 Pro - 10.0.22631",
+    "hostname": "pc1",
+    "username": "alice",
+    "version": "1.5.0",
+    "id": "123456789",
+    "uuid": "ZmFrZS11dWlk",
+    "preset-address-book-name": "Ops"
+  },
+  "response_text": "SYSINFO_UPDATED"
+}

@@ -1,0 +1,19 @@
+# Overlay on deploy/compose.dev.yml for the live e2e suite (npm run e2e:live).
+# e2e-live/run.ts runs it as its own Compose project (ferricade-e2e), so it
+# never touches a lab stack started from deploy/compose.yml, and it publishes
+# only the admin listener, on a port of its own: rdsim runs inside the app
+# container and reaches the client API there.
+services:
+  app:
+    ports: !override
+      - '127.0.0.1:21220:21120'
+    depends_on:
+      dex:
+        condition: service_started
+  dex:
+    image: ghcr.io/dexidp/dex:v2.41.1
+    command: ['dex', 'serve', '/etc/dex/config.yaml']
+    volumes:
+      - ../web/e2e-live/dex.config.yml:/etc/dex/config.yaml:ro
+    ports:
+      - '127.0.0.1:5556:5556'

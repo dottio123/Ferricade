@@ -1,0 +1,258 @@
+[
+  {
+    "key": "approve-mode",
+    "label": "How incoming connections are accepted",
+    "help": "Whether someone connecting needs the password, needs the person at the device to click Accept, or either.",
+    "type": "enum",
+    "values": [
+      "password",
+      "click",
+      "password-click"
+    ],
+    "default": "",
+    "os": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "lock": false,
+    "source": "libs/hbb_common/src/password_security.rs:77",
+    "value_labels": {
+      "click": "Click to accept only",
+      "password-click": "Password or click",
+      "password": "Password only"
+    }
+  },
+  {
+    "key": "verification-method",
+    "label": "Which passwords work",
+    "help": "Which password a connecting person may use: the temporary one RustDesk shows on the device, the fleet password set by this script, or either.",
+    "type": "enum",
+    "values": [
+      "use-temporary-password",
+      "use-permanent-password",
+      "use-both-passwords"
+    ],
+    "default": "",
+    "os": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "lock": false,
+    "source": "libs/hbb_common/src/password_security.rs:42",
+    "value_labels": {
+      "use-temporary-password": "Temporary password only",
+      "use-both-passwords": "Either password",
+      "use-permanent-password": "Permanent (fleet) password only"
+    }
+  },
+  {
+    "key": "enable-lan-discovery",
+    "label": "Visible on the local network",
+    "help": "Other RustDesk devices on the same network can find this device. RustDesk's default: on.",
+    "type": "bool",
+    "default": "",
+    "os": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:56",
+    "value_labels": {
+      "Y": "On",
+      "N": "Off"
+    }
+  },
+  {
+    "key": "direct-server",
+    "label": "Direct IP connections",
+    "help": "Accept connections straight to the device's IP address, bypassing your ID and relay servers. RustDesk's default: off.",
+    "type": "bool",
+    "default": "",
+    "os": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "lock": false,
+    "source": "libs/hbb_common/src/config.rs:2870",
+    "value_labels": {
+      "Y": "On",
+      "N": "Off"
+    }
+  },
+  {
+    "key": "enable-keyboard",
+    "label": "Remote control (keyboard and mouse)",
+    "help": "Let a connected person control the device. Off makes sessions view-only. RustDesk's default: on.",
+    "type": "bool",
+    "default": "",
+    "os": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:38",
+    "value_labels": {
+      "Y": "On",
+      "N": "Off"
+    }
+  },
+  {
+    "key": "enable-clipboard",
+    "label": "Clipboard sharing",
+    "help": "Copy and paste between the two devices during a session. RustDesk's default: on.",
+    "type": "bool",
+    "default": "",
+    "os": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:39",
+    "value_labels": {
+      "Y": "On",
+      "N": "Off"
+    }
+  },
+  {
+    "key": "enable-file-transfer",
+    "label": "File transfer",
+    "help": "Send and receive files during a session. RustDesk's default: on.",
+    "type": "bool",
+    "default": "",
+    "os": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:40",
+    "value_labels": {
+      "Y": "On",
+      "N": "Off"
+    }
+  },
+  {
+    "key": "enable-audio",
+    "label": "Sound",
+    "help": "Play the device's audio on the connecting computer. RustDesk's default: on.",
+    "type": "bool",
+    "default": "",
+    "os": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:44",
+    "value_labels": {
+      "Y": "On",
+      "N": "Off"
+    }
+  },
+  {
+    "key": "enable-remote-restart",
+    "label": "Restart from a session",
+    "help": "A connected person can restart the device and reconnect afterwards. RustDesk's default: on.",
+    "type": "bool",
+    "default": "",
+    "os": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:46",
+    "value_labels": {
+      "Y": "On",
+      "N": "Off"
+    }
+  },
+  {
+    "key": "enable-record-session",
+    "label": "Session recording",
+    "help": "A connecting person may record the session on their computer. RustDesk's default: on.",
+    "type": "bool",
+    "default": "",
+    "os": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:47",
+    "value_labels": {
+      "Y": "On",
+      "N": "Off"
+    }
+  },
+  {
+    "key": "enable-tunnel",
+    "label": "TCP tunnelling",
+    "help": "A connecting person may forward network ports through this device. RustDesk's default: on.",
+    "type": "bool",
+    "default": "",
+    "os": [
+      "windows",
+      "linux",
+      "macos"
+    ],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:45",
+    "value_labels": {
+      "Y": "On",
+      "N": "Off"
+    }
+  },
+  {
+    "key": "access-mode", "label": "Permission preset", "help": "Choose whether individual permission settings apply, all permissions are on, or the session is view-only.",
+    "type": "enum", "values": ["custom", "full", "view"], "default": "custom", "os": ["windows", "linux", "macos"], "lock": false,
+    "source": "src/server/connection.rs:2629-2643", "value_labels": {"custom": "Custom: use the permission settings", "full": "Full access", "view": "Screen view only"}
+  },
+  {
+    "key": "enable-remote-printer", "label": "Remote printing", "help": "Let a connected person print through this Windows device. RustDesk's default: on.",
+    "type": "bool", "default": "Y", "os": ["windows"], "lock": false, "source": "flutter/lib/desktop/pages/desktop_setting_page.dart:1191-1194", "value_labels": {"Y": "On", "N": "Off"}
+  },
+  {
+    "key": "enable-camera", "label": "Camera", "help": "Let a connected person use this device's camera. RustDesk's default: on.",
+    "type": "bool", "default": "Y", "os": ["windows", "linux", "macos"], "lock": false, "source": "src/server/connection.rs:2889", "value_labels": {"Y": "On", "N": "Off"}
+  },
+  {
+    "key": "enable-terminal", "label": "Remote terminal", "help": "Let a connected person open a terminal on this device. RustDesk's default: on.",
+    "type": "bool", "default": "Y", "os": ["windows", "linux", "macos"], "lock": false, "source": "src/server/connection.rs:2898", "value_labels": {"Y": "On", "N": "Off"}
+  },
+  {
+    "key": "enable-block-input", "label": "Block local input", "help": "Let a connected person block keyboard and mouse input on this Windows device. RustDesk's default: on.",
+    "type": "bool", "default": "Y", "os": ["windows"], "lock": false, "source": "flutter/lib/desktop/pages/desktop_setting_page.dart:1215-1218", "value_labels": {"Y": "On", "N": "Off"}
+  },
+  {
+    "key": "enable-privacy-mode", "label": "Privacy mode", "help": "Let a connected person hide this device's screen when supported. RustDesk's default: on.",
+    "type": "bool", "default": "Y", "os": ["windows", "macos"], "lock": false, "source": "src/privacy_mode.rs:327-357", "value_labels": {"Y": "On", "N": "Off"}
+  },
+  {
+    "key": "allow-remote-config-modification", "label": "Remote settings changes", "help": "On lets the connecting side change this device's settings. RustDesk's default: off.",
+    "type": "bool", "default": "N", "os": ["windows", "linux", "macos"], "lock": false, "source": "flutter/lib/common.dart:3154-3157", "value_labels": {"Y": "On", "N": "Off"}
+  },
+  {
+    "key": "keep-awake-during-incoming-sessions", "label": "Keep awake during incoming sessions", "help": "Keep this device awake while someone is connected. RustDesk's default: on.",
+    "type": "bool", "default": "Y", "os": ["windows", "linux", "macos"], "lock": false, "source": "src/server/connection.rs:6580-6594", "value_labels": {"Y": "On", "N": "Off"}
+  },
+  {
+    "key": "allow-only-conn-window-open", "label": "Require an open RustDesk window", "help": "Only allow connection if RustDesk window is open. RustDesk's default: off.",
+    "type": "bool", "default": "N", "os": ["windows", "linux", "macos"], "lock": false, "source": "src/server/connection.rs:1502-1507", "value_labels": {"Y": "On", "N": "Off"}
+  },
+  {
+    "key": "allow-auto-disconnect", "label": "Disconnect idle sessions", "help": "Disconnect inactive sessions after the chosen timeout. RustDesk's default: off.",
+    "type": "bool", "default": "N", "os": ["windows", "linux", "macos"], "lock": false, "source": "src/server/connection.rs:5632-5643", "value_labels": {"Y": "On", "N": "Off"}
+  },
+  {
+    "key": "auto-disconnect-timeout", "label": "Idle disconnect timeout", "help": "Minutes before an inactive session disconnects when automatic disconnect is on. RustDesk's default: 10 minutes.",
+    "type": "enum", "values": ["10", "30", "60", "120"], "default": "10", "os": ["windows", "linux", "macos"], "lock": false,
+    "source": "src/server/connection.rs:5632-5640", "value_labels": {"10": "10 minutes", "30": "30 minutes", "60": "60 minutes", "120": "120 minutes"}
+  }
+]

@@ -1,0 +1,17 @@
+{
+  "source": "derived",
+  "client_version": "1.5.0",
+  "ref": "src/server/connection.rs on_open",
+  "method": "POST",
+  "path": "/api/audit/conn",
+  "body": {
+    "ip": "203.0.113.7",
+    "action": "new",
+    "id": "123456789",
+    "uuid": "ZmFrZS11dWlk",
+    "conn_id": 3,
+    "session_id": 0,
+    "nonce": "00000000-0000-4000-8000-000000000001"
+  },
+  "response_empty": true
+}

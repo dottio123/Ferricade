@@ -1,0 +1,22 @@
+{
+  "source": "derived",
+  "client_version": "1.5.0",
+  "ref": "flutter/lib/models/group_model.dart _getDeviceGroups",
+  "method": "GET",
+  "path": "/api/device-group/accessible",
+  "query": {
+    "current": "1",
+    "pageSize": "100"
+  },
+  "headers": {
+    "Authorization": "Bearer [redacted]"
+  },
+  "response": {
+    "total": 1,
+    "data": [
+      {
+        "name": "Ops"
+      }
+    ]
+  }
+}

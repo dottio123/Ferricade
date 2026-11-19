@@ -1,0 +1,15 @@
+{
+  "source": "derived",
+  "client_version": "1.5.0",
+  "ref": "src/hbbs_http/account.rs OidcSession::query",
+  "method": "GET",
+  "path": "/api/oidc/auth-query",
+  "query": {
+    "code": "c0de",
+    "id": "123456789",
+    "uuid": "ZmFrZS11dWlk"
+  },
+  "response": {
+    "error": "No authed oidc is found"
+  }
+}

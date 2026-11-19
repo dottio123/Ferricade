@@ -1,0 +1,43 @@
+# Lab for capturing real RustDesk client traffic. See docs/lab.md.
+# Only for that: it runs the recorder on port 21114, where ferricade's client
+# API would be. To run ferricade with hbbs and hbbr, use
+# deploy/compose.yml --profile rustdesk (README.md).
+# Every host port can be changed through the environment; defaults are the
+# stock RustDesk ports.
+name: ferricade-lab
+
+services:
+  hbbs:
+    image: rustdesk/rustdesk-server:1.1.16
+    command: hbbs -r ${LAB_HOST:?set LAB_HOST to this machine's LAN address}:${HBBR_PORT:-21117}
+    ports:
+      - "${HBBS_NAT_PORT:-21115}:21115"
+      - "${HBBS_PORT:-21116}:21116"
+      - "${HBBS_PORT:-21116}:21116/udp"
+    volumes:
+      - ./data:/root
+    restart: unless-stopped
+
+  hbbr:
+    image: rustdesk/rustdesk-server:1.1.16
+    command: hbbr
+    ports:
+      - "${HBBR_PORT:-21117}:21117"
+    volumes:
+      - ./data:/root
+    restart: unless-stopped
+
+  recorder:
+    build:
+      context: ../..
+    command:
+      - record
+      - --listen=:21114
+      - --out=/captures/captures.jsonl
+      - --client-version=${CLIENT_VERSION:?set CLIENT_VERSION to the client under test, e.g. 1.5.0}
+    user: "${LAB_UID:-1000}:${LAB_GID:-1000}"
+    ports:
+      - "${API_PORT:-21114}:21114"
+    volumes:
+      - ./captures:/captures
+    restart: unless-stopped

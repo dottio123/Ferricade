@@ -1,0 +1,21 @@
+{
+  "source": "derived",
+  "client_version": "1.5.0",
+  "ref": "src/server/connection.rs (after auth)",
+  "method": "POST",
+  "path": "/api/audit/conn",
+  "body": {
+    "peer": [
+      "987654321",
+      "bob"
+    ],
+    "type": 0,
+    "primary_auth": 1,
+    "id": "123456789",
+    "uuid": "ZmFrZS11dWlk",
+    "conn_id": 3,
+    "session_id": 12345678901234567891,
+    "nonce": "00000000-0000-4000-8000-000000000002"
+  },
+  "response_empty": true
+}

@@ -1,0 +1,114 @@
+[
+  {
+    "key": "approve-mode",
+    "label": "Approve incoming sessions",
+    "help": "Password, local click, or both. An unset value also means both.",
+    "type": "enum",
+    "values": ["password", "click", ""],
+    "default": "",
+    "os": ["windows", "linux", "macos"],
+    "lock": false,
+    "source": "libs/hbb_common/src/password_security.rs:77"
+  },
+  {
+    "key": "verification-method",
+    "label": "Accepted passwords",
+    "help": "Temporary password, permanent password, or both. An unset value also means both.",
+    "type": "enum",
+    "values": ["use-temporary-password", "use-permanent-password", "use-both-passwords"],
+    "default": "",
+    "os": ["windows", "linux", "macos"],
+    "lock": false,
+    "source": "libs/hbb_common/src/password_security.rs:42"
+  },
+  {
+    "key": "enable-lan-discovery",
+    "label": "LAN discovery",
+    "help": "Allow this device to be discovered on the local network. Y enables and N disables; unset is enabled.",
+    "type": "bool",
+    "default": "",
+    "os": ["windows", "linux", "macos"],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:56"
+  },
+  {
+    "key": "direct-server",
+    "label": "Direct IP access",
+    "help": "Listen for direct IP connections. Y enables and N disables; unset is disabled. The port is a separate string option.",
+    "type": "bool",
+    "default": "",
+    "os": ["windows", "linux", "macos"],
+    "lock": false,
+    "source": "libs/hbb_common/src/config.rs:2870"
+  },
+  {
+    "key": "enable-keyboard",
+    "label": "Keyboard and mouse",
+    "help": "Allow keyboard and mouse control in incoming sessions. Y enables and N disables; unset is enabled.",
+    "type": "bool",
+    "default": "",
+    "os": ["windows", "linux", "macos"],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:38"
+  },
+  {
+    "key": "enable-clipboard",
+    "label": "Clipboard",
+    "help": "Allow clipboard in incoming sessions. Y enables and N disables; unset is enabled.",
+    "type": "bool",
+    "default": "",
+    "os": ["windows", "linux", "macos"],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:39"
+  },
+  {
+    "key": "enable-file-transfer",
+    "label": "File transfer",
+    "help": "Allow incoming file transfer. Y enables and N disables; unset is enabled.",
+    "type": "bool",
+    "default": "",
+    "os": ["windows", "linux", "macos"],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:40"
+  },
+  {
+    "key": "enable-audio",
+    "label": "Audio",
+    "help": "Allow audio in incoming sessions. Y enables and N disables; unset is enabled.",
+    "type": "bool",
+    "default": "",
+    "os": ["windows", "linux", "macos"],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:44"
+  },
+  {
+    "key": "enable-remote-restart",
+    "label": "Remote restart",
+    "help": "Allow a remote operator to restart this device. Y enables and N disables; unset is enabled.",
+    "type": "bool",
+    "default": "",
+    "os": ["windows", "linux", "macos"],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:46"
+  },
+  {
+    "key": "enable-record-session",
+    "label": "Session recording",
+    "help": "Allow an incoming session to be recorded. Y enables and N disables; unset is enabled.",
+    "type": "bool",
+    "default": "",
+    "os": ["windows", "linux", "macos"],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:47"
+  },
+  {
+    "key": "enable-tunnel",
+    "label": "TCP tunnelling",
+    "help": "Allow TCP tunnelling through this device. Y enables and N disables; unset is enabled.",
+    "type": "bool",
+    "default": "",
+    "os": ["windows", "linux", "macos"],
+    "lock": false,
+    "source": "libs/base/src/config/keys.rs:45"
+  }
+]

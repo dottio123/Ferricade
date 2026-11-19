@@ -1,0 +1,41 @@
+{
+  "source": "derived",
+  "client_version": "1.5.0",
+  "ref": "src/hbbs_http/account.rs AuthBody (tfa step)",
+  "method": "POST",
+  "path": "/api/login",
+  "body": {
+    "username": "alice",
+    "password": "[redacted]",
+    "id": "123456789",
+    "uuid": "ZmFrZS11dWlk",
+    "autoLogin": true,
+    "type": "account",
+    "deviceInfo": {
+      "os": "windows",
+      "type": "client",
+      "name": "pc1"
+    }
+  },
+  "response": {
+    "access_token": "",
+    "type": "tfa_check",
+    "tfa_type": "totp",
+    "secret": "s",
+    "user": {
+      "name": "alice",
+      "display_name": "Alice",
+      "avatar": "",
+      "email": "alice@example.com",
+      "note": "",
+      "status": 1,
+      "info": {
+        "email_verification": false,
+        "email_alarm_notification": false,
+        "login_device_whitelist": [],
+        "other": {}
+      },
+      "is_admin": false
+    }
+  }
+}

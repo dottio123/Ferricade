@@ -1,0 +1,13 @@
+{
+  "source": "derived",
+  "client_version": "1.5.0",
+  "ref": "flutter/lib/models/ab_model.dart LegacyAb.pullAbImpl",
+  "method": "GET",
+  "path": "/api/ab",
+  "headers": {
+    "Authorization": "Bearer [redacted]"
+  },
+  "response": {
+    "data": "{\"tags\":[\"work\"],\"peers\":[{\"id\":\"123456789\",\"username\":\"alice\",\"hostname\":\"pc1\",\"platform\":\"Windows\",\"alias\":\"\",\"tags\":[\"work\"],\"hash\":\"\"}],\"tag_colors\":\"{\\\"work\\\":4280391411}\"}"
+  }
+}

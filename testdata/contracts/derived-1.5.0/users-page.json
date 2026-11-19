@@ -1,0 +1,33 @@
+{
+  "source": "derived",
+  "client_version": "1.5.0",
+  "ref": "flutter/lib/models/group_model.dart _getUsers",
+  "method": "GET",
+  "path": "/api/users",
+  "query": {
+    "current": "1",
+    "pageSize": "100",
+    "accessible": "",
+    "status": "1"
+  },
+  "headers": {
+    "Authorization": "Bearer [redacted]"
+  },
+  "response": {
+    "total": 1,
+    "data": [
+      {
+        "name": "alice",
+        "display_name": "Alice",
+        "status": 1,
+        "info": {
+          "email_verification": false,
+          "email_alarm_notification": false,
+          "login_device_whitelist": [],
+          "other": {}
+        },
+        "is_admin": false
+      }
+    ]
+  }
+}

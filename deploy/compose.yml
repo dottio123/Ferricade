@@ -1,0 +1,61 @@
+# Production: ferricade and Postgres with the published ferricade image.
+# Download this file and .env.example from the same release into deploy/.
+# Copy .env.example to .env, fill its required values, then run:
+# docker compose --env-file deploy/.env -f deploy/compose.yml up -d
+# Add compose.rustdesk.yml if you also need hbbs and hbbr.
+# See README.md for HTTPS reverse proxy and setup instructions.
+name: ferricade
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ferricade
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD to a generated database password}
+      POSTGRES_DB: ferricade
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      # During first-time initialisation Postgres listens only on its Unix socket.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ferricade -d ferricade"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # no-new-privileges breaks the postgres image on some Podman hosts: gosu hangs and pg_ctl cannot signal its own server.
+    # Running as postgres keeps the container non-root.
+    user: postgres
+    restart: unless-stopped
+    logging: &logging
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  app:
+    image: ghcr.io/dottio123/ferricade:${FERRICADE_VERSION:?set FERRICADE_VERSION to a release, e.g. 1.0.0}
+    command: ["serve"]
+    volumes:
+      - ./logs:/var/log/ferricade
+    ports:
+      - "${FERRICADE_CLIENT_PORT:-21114}:21114" # Keep 21114: RustDesk clients derive this port.
+      - "${ADMIN_BIND:-127.0.0.1}:${FERRICADE_ADMIN_PORT:-21120}:21120" # Your HTTPS reverse proxy connects here.
+    environment:
+      DATABASE_URL: postgres://ferricade:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD to a generated database password}@db:5432/ferricade?sslmode=disable
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY to base64 of at least 32 random bytes, e.g. $(openssl rand -base64 32)}
+      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL to the https admin console URL}
+      HBBS_ADDR: ${HBBS_ADDR:-}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      MAX_PENDING_DEVICES: ${MAX_PENDING_DEVICES:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  db-data:
+    name: ferricade_pgdata
