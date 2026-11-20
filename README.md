@@ -51,10 +51,14 @@ the two secrets, then start the services:
 cp deploy/.env.example deploy/.env
 # Set FERRICADE_VERSION, SECRET_KEY, PUBLIC_URL, and POSTGRES_PASSWORD.
 # Generate SECRET_KEY with openssl rand -base64 32.
-# Generate POSTGRES_PASSWORD with openssl rand -base64 24.
+# Generate POSTGRES_PASSWORD with openssl rand -hex 24.
 docker compose --env-file deploy/.env -f deploy/compose.yml up -d
 docker compose --env-file deploy/.env -f deploy/compose.yml logs app | grep 'setup token'
 ```
+
+For production, set `PUBLIC_URL` to the HTTPS URL served by your reverse proxy.
+For a local HTTP trial, use [deploy/compose.dev.yml](deploy/compose.dev.yml) as
+described in [the development guide](docs/guide.md).
 
 ### First run
 
@@ -73,8 +77,10 @@ does not prevent an unapproved client from using the RustDesk server.
 
 RustDesk clients use `hbbs` and `hbbr` for rendezvous and relay traffic. They
 send device heartbeats and system information to Ferricade's client API on port
-21114. The admin console uses Ferricade's admin API on port 21120 behind an
-HTTPS reverse proxy.
+21114. Ferricade listens on `:21114` and `:21120` inside the Compose network by
+default; `FERRICADE_CLIENT_PORT` and `FERRICADE_ADMIN_PORT` change the host ports,
+and `ADMIN_BIND` changes the admin host address. The admin console uses the
+admin API behind an HTTPS reverse proxy.
 
 | Port | Service | Use |
 |---|---|---|

@@ -35,7 +35,7 @@ cp deploy/.env.example deploy/.env
 
 Set `FERRICADE_VERSION` to the release version, generate `SECRET_KEY` with
 `openssl rand -base64 32`, generate `POSTGRES_PASSWORD` with
-`openssl rand -base64 24`, and set `PUBLIC_URL` to the HTTPS console URL. Start
+`openssl rand -hex 24`, and set `PUBLIC_URL` to the HTTPS console URL. Start
 Ferricade and read the one-time setup token from its log:
 
 ```sh

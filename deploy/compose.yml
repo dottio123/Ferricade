@@ -11,7 +11,7 @@ services:
     image: postgres:16
     environment:
       POSTGRES_USER: ferricade
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD to a generated database password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD to a generated database password, e.g. $(openssl rand -hex 24)}
       POSTGRES_DB: ferricade
     volumes:
       - db-data:/var/lib/postgresql/data
@@ -30,7 +30,7 @@ services:
       options: {max-size: "10m", max-file: "3"}
 
   app:
-    image: ghcr.io/dottio123/ferricade:${FERRICADE_VERSION:?set FERRICADE_VERSION to a release, e.g. 1.0.0}
+    image: ghcr.io/dottio123/ferricade:${FERRICADE_VERSION:?set FERRICADE_VERSION to a release tag, e.g. 2.1.1}
     command: ["serve"]
     volumes:
       - ./logs:/var/log/ferricade
@@ -38,7 +38,7 @@ services:
       - "${FERRICADE_CLIENT_PORT:-21114}:21114" # Keep 21114: RustDesk clients derive this port.
       - "${ADMIN_BIND:-127.0.0.1}:${FERRICADE_ADMIN_PORT:-21120}:21120" # Your HTTPS reverse proxy connects here.
     environment:
-      DATABASE_URL: postgres://ferricade:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD to a generated database password}@db:5432/ferricade?sslmode=disable
+      DATABASE_URL: postgres://ferricade:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD to a generated database password, e.g. $(openssl rand -hex 24)}@db:5432/ferricade?sslmode=disable
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY to base64 of at least 32 random bytes, e.g. $(openssl rand -base64 32)}
       PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL to the https admin console URL}
       HBBS_ADDR: ${HBBS_ADDR:-}
