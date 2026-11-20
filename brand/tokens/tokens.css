@@ -1,0 +1,31 @@
+:root {
+  /* Core */
+  --fc-iron: #2B2E33;
+  --fc-night: #181A1D;
+  --fc-cream: #ECE6DC;
+  --fc-paper: #F0EEEB;
+  --fc-rust: #B7410E;
+  --fc-rust-on-dark: #D65C26;
+  /* Oxide texture, on light */
+  --fc-oxide-rim: #56200B;
+  --fc-oxide-face: #9E3A11;
+  --fc-oxide-warm: #BE4E1A;
+  --fc-oxide-bright: #D66C2E;
+  --fc-oxide-dark: #762A0D;
+  --fc-oxide-pit: #3E1608;
+  --fc-oxide-flake: #8C3410;
+  /* Oxide texture, on dark */
+  --fc-oxide-rim-on-dark: #843210;
+  --fc-oxide-face-on-dark: #B04214;
+  --fc-oxide-warm-on-dark: #CC5820;
+  --fc-oxide-bright-on-dark: #E27838;
+  --fc-oxide-dark-on-dark: #802E0E;
+  --fc-oxide-pit-on-dark: #461A09;
+  --fc-oxide-flake-on-dark: #AA4014;
+  /* Type */
+  --fc-font-display: Bahnschrift, "Barlow", "DIN Alternate", system-ui, sans-serif;
+  /* Logo colours that follow the colour scheme (needs color-scheme: light dark) */
+  --fc-logo-ink: light-dark(var(--fc-iron), var(--fc-cream));
+  --fc-logo-accent: light-dark(var(--fc-rust), var(--fc-rust-on-dark));
+  --fc-logo-ground: light-dark(var(--fc-paper), var(--fc-night));
+}

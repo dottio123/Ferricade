@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ferricade motion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* VOICE  calm product motion spec, shown to one developer-designer
+   IDEA   a motion review board: the real loader and intro playing on the app's own grounds
+   PICTURE the animations themselves, large, on Night and Paper, with a live timeline under the intro
+   COLOUR night #181A1D and paper #F0EEEB grounds, cream/iron ink, one rust accent #B7410E
+   TYPE   Bahnschrift (the logo face) with Barlow as the web fallback
+   LAYOUT loader pair across the top, intro full width below with controls and timeline; stacks under 600px */
+:root{color-scheme:light dark;--bg:light-dark(#f7f5f2,#0f1012);--ink:light-dark(#2b2e33,#ece6dc);--soft:light-dark(#5d6168,#a9a59e);--line:light-dark(#dcd8d2,#2a2c30);--panel:light-dark(#fff,#17181b);--rust:light-dark(#b7410e,#d65c26)}
+:root[data-theme=light]{color-scheme:light}
+:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 Bahnschrift,"Barlow",system-ui,sans-serif;overflow-x:clip}
+.band{padding-block:clamp(22px,3.4vw,48px);padding-inline:max(5vw,16px)}
+.wrap{max-width:1240px;margin-inline:auto}
+h1{font-size:clamp(32px,4.4vw,46px);line-height:1.05;letter-spacing:-.02em;margin:0 0 10px;font-weight:700;text-wrap:balance}
+h2{font-size:24px;line-height:1.1;margin:0;font-weight:700;letter-spacing:-.01em}
+p{margin:0}
+.lead{color:var(--soft);max-width:62ch}
+.top{padding-bottom:0}
+.head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px 24px;margin-bottom:16px}
+.head p{color:var(--soft);font-size:15px;margin-top:4px;max-width:58ch}
+.pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.stage{position:relative;margin:0;border-radius:14px;display:grid;place-items:center;overflow:hidden}
+.stage.night{background:#181a1d}
+.stage.paper{background:#f0eeeb;box-shadow:inset 0 0 0 1px #dcd8d2}
+.stage figcaption{position:absolute;left:14px;bottom:10px;font-size:13px;color:#8a8780}
+.loader{aspect-ratio:16/11}
+.loader svg{width:min(56%,260px);height:auto}
+.wide{aspect-ratio:1494/700;padding:clamp(10px,3vw,36px)}
+.wide svg{width:100%;height:auto}
+.hold .fx *{animation-play-state:paused!important}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;border-radius:0;background:transparent}
+.seg button+button{border-left:1px solid var(--line)}
+button{font:500 15px/1 Bahnschrift,"Barlow",system-ui,sans-serif;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:10px;min-height:44px;padding:0 16px;cursor:pointer}
+button:hover{background:color-mix(in srgb,var(--panel) 80%,var(--rust))}
+button:focus-visible{outline:2px solid var(--rust);outline-offset:2px}
+button[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+button.primary{background:var(--rust);border-color:var(--rust);color:#fff}
+.tl{position:relative;height:30px;margin:18px 0 8px}
+.tl .track{position:absolute;left:0;right:0;top:14px;height:2px;background:var(--line)}
+.tl .tick{position:absolute;top:9px;width:2px;height:12px;background:var(--soft);transform:translateX(-1px)}
+.tl .ph{position:absolute;top:6px;left:0;width:3px;height:18px;border-radius:2px;background:var(--rust);animation:ph 4.85s linear both}
+.hold~.tl .ph,.tl.hold .ph{animation-play-state:paused}
+@keyframes ph{from{left:0}to{left:calc(100% - 3px)}}
+.beats{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(15em,1fr));gap:6px 28px}
+.beats li{display:grid;grid-template-columns:4.2em minmax(0,1fr);gap:8px;font-size:15px;padding:6px 0;border-top:1px solid var(--line)}
+.beats b{font-weight:500;color:var(--rust);white-space:nowrap;font-variant-numeric:tabular-nums}
+.notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22em),1fr));gap:18px 40px}
+.notes h3{font-size:17px;margin:0 0 4px}
+.notes p{color:var(--soft);font-size:15px}
+pre{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:8px 0 0;font-size:13px}
+code{font-family:ui-monospace,Consolas,monospace;overflow-wrap:anywhere}
+.status{font-size:14px;color:var(--soft)}
+@media(max-width:600px){.pair{grid-template-columns:minmax(0,1fr)}.wide{aspect-ratio:1494/900}.head{align-items:start}}
+@media(prefers-reduced-motion:reduce){.tl .ph{animation:none;left:calc(100% - 3px)}}
+/*FX_CSS*/
+</style>
+</head>
+<body>
+<header class="band top"><div class="wrap">
+  <h1>Ferricade motion</h1>
+  <p class="lead">Built from the corner F. The rings are true outlines of the F pushed outward, so they start soft and round far away and sharpen into the letter as they pull in.</p>
+</div></header>
+
+<section class="band"><div class="wrap">
+  <div class="head">
+    <div><h2>Loader</h2><p>3.6 s loop. A ring lands every 1.2 s and the rust tip warms as it arrives.</p></div>
+    <div class="controls"><button type="button" id="copyLoader" data-copy="loader">Copy loader SVG</button><span class="status" id="loaderStatus" aria-live="polite"></span></div>
+  </div>
+  <div class="pair">
+    <figure class="stage night loader"><!--LOADER_NIGHT--><figcaption>Night</figcaption></figure>
+    <figure class="stage paper loader"><!--LOADER_PAPER--><figcaption>Paper</figcaption></figure>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="head">
+    <div><h2>Intro</h2><p>Plays once, just under 5 seconds, for first launch. The F gathers, then opens into the wordmark.</p></div>
+    <div class="controls">
+      <div class="seg" role="group" aria-label="Pointer"><button type="button" data-set="pointer" data-v="a" aria-pressed="false">Pointer A</button><button type="button" data-set="pointer" data-v="b" aria-pressed="true">Pointer B</button></div>
+      <div class="seg" role="group" aria-label="Ground"><button type="button" data-set="ground" data-v="night" aria-pressed="true">Night</button><button type="button" data-set="ground" data-v="paper" aria-pressed="false">Paper</button></div>
+      <button type="button" class="primary" id="replay">Replay</button>
+      <button type="button" id="copyIntro" data-copy="intro">Copy intro SVG</button><span class="status" id="introStatus" aria-live="polite"></span>
+    </div>
+  </div>
+  <figure class="stage night wide hold" id="introStage"></figure>
+  <div class="tl hold" id="tl" aria-hidden="true"><div class="track"></div><div class="ph" id="ph"></div></div>
+  <ol class="beats" id="beats"></ol>
+</div></section>
+
+<section class="band"><div class="wrap notes">
+  <div><h3>Dropping them into Ferricade</h3><p>Each file is one SVG with its own CSS. Inline it, or use it as an <code>&lt;img&gt;</code>. Colours follow the system light or dark setting; on an inline SVG add <code>night</code> or <code>paper</code> to its class to pin a ground.</p></div>
+  <div><h3>Replaying the intro</h3><p>CSS animations restart when the node is replaced, so a replay is one line.</p><pre><code>el.replaceWith(el = el.cloneNode(true));</code></pre></div>
+  <div><h3>Reduced motion</h3><p>With reduced motion on, the rings are dropped, the loader keeps only a slow warm pulse on the tip, and the intro simply fades in at its final layout.</p></div>
+  <div><h3>Size</h3><p>The loader reads best from about 96 px. Smaller than that the rings get hairline thin; the F and its tip still carry it.</p></div>
+</div></section>
+
+<script>
+{
+/*INTRO_DATA*/
+const BEATS=[[0,'Three rings pull in from wide, rounded outlines'],[0.55,'The F condenses as they land'],[1.35,'The rusted tip snaps into its corner'],[2.0,'The F glides left and settles to wordmark size'],[2.62,'Letters are drawn in toward it, one by one'],[3.3,'The pointer drifts in over the ı'],[4.05,'Click: it presses, flashes, the ı dips and a ripple rings out'],[4.85,'Settled']];
+const TOTAL=4.85;
+const stage=document.getElementById('introStage');
+const tl=document.getElementById('tl');
+const ph=document.getElementById('ph');
+document.getElementById('beats').innerHTML=BEATS.map(([s,txt])=>`<li><b>${s.toFixed(2)} s</b><span>${txt}</span></li>`).join('');
+tl.insertAdjacentHTML('beforeend',BEATS.map(([s])=>`<span class="tick" style="left:${(s/TOTAL*100).toFixed(2)}%"></span>`).join(''));
+const state={pointer:'b',ground:'night'};
+const render=()=>{
+  stage.innerHTML=INTRO[state.pointer].replace('class="fx"',`class="fx ${state.ground}"`);
+  stage.classList.remove('night','paper');stage.classList.add(state.ground);
+  ph.style.animation='none';void ph.offsetWidth;ph.style.animation='';
+};
+const play=()=>{stage.classList.remove('hold');tl.classList.remove('hold');render();};
+render();
+const io=new IntersectionObserver(es=>{if(es.some(e=>e.isIntersecting)){io.disconnect();play();}},{threshold:.45});
+io.observe(stage);
+document.getElementById('replay').addEventListener('click',play);
+for(const b of document.querySelectorAll('[data-set]')){
+  b.addEventListener('click',()=>{
+    state[b.dataset.set]=b.dataset.v;
+    for(const o of document.querySelectorAll(`[data-set="${b.dataset.set}"]`))o.setAttribute('aria-pressed',String(o===b));
+    play();
+  });
+}
+const copy=async(btn,text,statusId)=>{
+  const s=document.getElementById(statusId);
+  try{await navigator.clipboard.writeText(text);s.textContent='Copied';}catch(e){s.textContent='Copy blocked';}
+  setTimeout(()=>{s.textContent='';},1800);
+};
+document.getElementById('copyLoader').addEventListener('click',e=>copy(e.currentTarget,FILES.loader,'loaderStatus'));
+document.getElementById('copyIntro').addEventListener('click',e=>copy(e.currentTarget,FILES[state.pointer],'introStatus'));
+}
+</script>
+</body>
+</html>
