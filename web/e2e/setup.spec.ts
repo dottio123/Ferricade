@@ -37,8 +37,18 @@ test.describe('First-run setup wizard flows', () => {
     await expect(
       page.getByRole('heading', { level: 2, name: 'Configure server profile' }),
     ).toBeVisible()
-    await page.getByLabel('ID server host').fill('rd.example.com')
-    await page.getByLabel('Relay server host').fill('rd.example.com')
+    await page.getByLabel('ID server host').fill('hbbs')
+    await page.getByLabel('Relay server host').fill('hbbr')
+    await expect(
+      page.getByText(
+        "Clients on other machines can't reach hbbs. Use this server's LAN IP or DNS name.",
+      ),
+    ).toBeVisible()
+    await expect(
+      page.getByText(
+        "Clients on other machines can't reach hbbr. Use this server's LAN IP or DNS name.",
+      ),
+    ).toBeVisible()
     await page.getByLabel('Public key').fill(DEMO_PUBLIC_KEY)
     await page.getByRole('button', { name: 'Save and check server' }).click()
 
@@ -55,7 +65,7 @@ test.describe('First-run setup wizard flows', () => {
       page.getByRole('heading', { level: 2, name: 'Review and complete setup' }),
     ).toBeVisible()
     await expect(page.getByText('superowner')).toBeVisible()
-    await expect(page.getByText('rd.example.com').first()).toBeVisible()
+    await expect(page.getByText('hbbs').first()).toBeVisible()
 
     // Complete setup
     await page.getByRole('button', { name: 'Finish setup' }).click()

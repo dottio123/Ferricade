@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Wordmark } from '@/components/brand/wordmark'
 import { currentVersion, parseChangelog } from './changelog'
 
-const releases = parseChangelog(changelogText)
+const releases = parseChangelog(changelogText).filter((release) => release.date !== null)
 const version = currentVersion(releases)
 const CHANGELOG_RELEASES_SHOWN = 5
 

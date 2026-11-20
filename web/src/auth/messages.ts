@@ -17,6 +17,7 @@ export function getAuthErrorMessage(
   const desc = describeError(err)
 
   if (err instanceof ApiError) {
+    if (context === 'login' && err.code === 'csrf') return err.message
     if (context === 'login' && (err.status === 401 || err.code === 'unauthenticated')) {
       return "That username and password don't match."
     }

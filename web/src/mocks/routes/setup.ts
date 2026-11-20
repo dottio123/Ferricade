@@ -13,7 +13,7 @@ export function setupRoutes(env: Env): HttpHandler[] {
 
   return [
     route(env, 'public', 'get', '/setup/status', ({ respond }) =>
-      respond(200, { setup_complete: db.setup.complete }),
+      respond(200, { setup_complete: db.setup.complete, plain_http: env.config.plainHttp }),
     ),
 
     route(env, 'setup', 'post', '/setup/owner', async ({ request, respond }) => {

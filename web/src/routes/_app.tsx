@@ -60,6 +60,7 @@ import {
   LiveIndicator,
   useServerHealth,
 } from '../components/server/live-indicator'
+import { PlainHttpIndicator } from '../components/server/plain-http-indicator'
 import { DevicePanel } from '../components/devices/device-panel'
 import { GlobalGroupConflictDialog } from '../components/devices/group-conflict-dialog'
 import { CommandPalette } from '../components/palette/command-palette'
@@ -805,7 +806,8 @@ function AppShell() {
               </Button>
             </div>
 
-            <div className="flex items-center flex-wrap justify-end gap-2 sm:gap-4 min-w-0">
+            <div className="flex items-center flex-wrap justify-end gap-3 sm:gap-4 min-w-0">
+              <PlainHttpIndicator />
               <LiveIndicator />
             </div>
           </header>

@@ -381,7 +381,10 @@ describe('the auth guard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     await heading('Two-factor code')
     expect(queryClient.getQueryData(previous)).toBeUndefined()
-    expect(queryClient.getQueryData(queryKeys.setupStatus())).toEqual({ setup_complete: true })
+    expect(queryClient.getQueryData(queryKeys.setupStatus())).toEqual({
+      setup_complete: true,
+      plain_http: false,
+    })
   })
 
   it('sends a 401 mid-session to sign-in with the current page as next', async () => {
@@ -589,5 +592,35 @@ describe('setup detection', () => {
     const { router } = renderAt('/sign-in', { mock: '?mock-setup=incomplete' })
     expect(await heading('First-run setup')).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/first-run')
+  })
+})
+
+describe('plain HTTP indicator', () => {
+  const NOTICE =
+    'This console is served over plain HTTP. Sign-ins and session cookies are not encrypted on the network.'
+
+  it('is absent on the signed-in console and sign-in page when plain_http is false', async () => {
+    renderAt('/')
+    await heading('Command Center')
+    expect(screen.queryByRole('button', { name: 'Plain HTTP connection' })).not.toBeInTheDocument()
+    cleanup()
+
+    renderAt('/sign-in', { session: signedOut })
+    await heading('Sign in')
+    expect(screen.queryByText(NOTICE)).not.toBeInTheDocument()
+  })
+
+  it('shows the console indicator and sign-in helper text when plain_http is true', async () => {
+    renderAt('/', { mock: '?mock-http=plain' })
+    await heading('Command Center')
+    const trigger = await screen.findByRole('button', { name: 'Plain HTTP connection' })
+    expect(trigger).toHaveTextContent('HTTP')
+    fireEvent.click(trigger)
+    expect(await screen.findByText(NOTICE)).toBeInTheDocument()
+    cleanup()
+
+    renderAt('/sign-in', { mock: '?mock-http=plain', session: signedOut })
+    await heading('Sign in')
+    expect(await screen.findByText(NOTICE)).toBeInTheDocument()
   })
 })

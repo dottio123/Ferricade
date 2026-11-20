@@ -667,7 +667,7 @@ export interface paths {
          *     https (http://localhost and http://127.0.0.1 are allowed for testing). Turning it on
          *     needs an issuer, a client ID, a client secret and at least one owner, admin or user group.
          *     Audited as settings.oidc_updated with the names of the changed fields (never the secret).
-         *     In DEV_INSECURE mode any http issuer is allowed.
+         *     In ALLOW_HTTP mode any http issuer is allowed.
          *     Roles from groups: owner if any owner group matches, else admin, else user; no match refuses the sign-in.
          */
         patch: {
@@ -952,6 +952,8 @@ export interface paths {
                     content: {
                         "application/json": {
                             setup_complete: boolean;
+                            /** @description The console is served over plain HTTP (ALLOW_HTTP); the UI shows a warning. */
+                            plain_http: boolean;
                         };
                     };
                 };

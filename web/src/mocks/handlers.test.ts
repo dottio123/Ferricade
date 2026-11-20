@@ -1666,7 +1666,10 @@ describe('first-run setup (?mock-setup=incomplete)', () => {
   })
 
   it('walks the wizard and then locks /setup', async () => {
-    expect(await check('GET', '/setup/status', 200)).toEqual({ setup_complete: false })
+    expect(await check('GET', '/setup/status', 200)).toEqual({
+      setup_complete: false,
+      plain_http: false,
+    })
     await check('POST', '/setup/owner', 401, { body: { username: 'me', password: PASSWORD } })
     await check('POST', '/setup/owner/totp', 409, tok)
     await check('POST', '/setup/owner', 400, {
@@ -1705,7 +1708,10 @@ describe('first-run setup (?mock-setup=incomplete)', () => {
       client_config: Schemas['ClientConfig']
     }
     expect(done.client_config.host).toBe('rd.example.com')
-    expect(await check('GET', '/setup/status', 200)).toEqual({ setup_complete: true })
+    expect(await check('GET', '/setup/status', 200)).toEqual({
+      setup_complete: true,
+      plain_http: false,
+    })
     await check('POST', '/setup/complete', 404, tok)
     // the owner just created can sign in
     await check('POST', `${V1}/auth/login`, 200, { body: { username: 'me', password: PASSWORD } })
@@ -1725,21 +1731,31 @@ describe('behaviour switches', () => {
       delayMs: 0,
       role: 'owner',
       setupIncomplete: false,
+      plainHttp: false,
     })
     const c = readMockConfig(
-      '?mock=large&mock-delay=250&mock-fail=listDevices,getServer&mock-role=admin&mock-setup=incomplete',
+      '?mock=large&mock-delay=250&mock-fail=listDevices,getServer&mock-role=admin&mock-setup=incomplete&mock-http=plain',
     )
     expect(c.size).toBe('large')
     expect(c.delayMs).toBe(250)
     expect([...c.failOperations]).toEqual(['listDevices', 'getServer'])
     expect(c.role).toBe('admin')
     expect(c.setupIncomplete).toBe(true)
+    expect(c.plainHttp).toBe(true)
     // junk falls back to the defaults
     expect(readMockConfig('?mock=huge&mock-delay=-5&mock-role=root')).toMatchObject({
       size: 'medium',
       delayMs: 0,
       role: 'owner',
+      plainHttp: false,
     })
+  })
+
+  it('?mock-http=plain makes GET /setup/status return plain_http: true', async () => {
+    server = use(createMockDB('small'), readMockConfig('?mock-http=plain'))
+    const res = await send('GET', '/setup/status')
+    expect(res.status).toBe(200)
+    expect(res.body).toEqual({ setup_complete: true, plain_http: true })
   })
 
   it('has 3, 40 and 400 devices', async () => {

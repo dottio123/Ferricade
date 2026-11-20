@@ -9,6 +9,13 @@ describe('getAuthErrorMessage', () => {
     expect(getAuthErrorMessage(err)).toBe('Too many attempts. Try again in a few minutes.')
   })
 
+  it('shows the server origin guidance after a sign-in csrf failure', () => {
+    const err = new ApiError(403, 'csrf', 'Open the console at https://console.example.com')
+    expect(getAuthErrorMessage(err, 'login')).toBe(
+      'Open the console at https://console.example.com',
+    )
+  })
+
   it('maps invalid_code error', () => {
     const err = new ApiError(400, 'invalid_code', 'wrong code')
     expect(getAuthErrorMessage(err)).toBe("That code didn't match. Check your app and try again.")

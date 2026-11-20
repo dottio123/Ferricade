@@ -44,9 +44,41 @@ describe('Server settings', () => {
   it('saves the optional client API address', async () => {
     const { db } = renderServerSettings()
     const field = await screen.findByRole('textbox', { name: 'Client API address' })
+    expect(field).toHaveAttribute('placeholder', 'Leave blank for the default')
+    expect(screen.getByText('Using http://rd.example.com:21114')).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('textbox', { name: 'ID server host' }), {
+      target: { value: '172.16.1.154:21116' },
+    })
+    expect(screen.getByText('Using http://172.16.1.154:21114')).toBeInTheDocument()
     fireEvent.change(field, { target: { value: 'https://rustdesk-api.example.com/' } })
+    expect(screen.getByText('Using https://rustdesk-api.example.com/')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
     await waitFor(() => expect(db.server?.api_url).toBe('https://rustdesk-api.example.com'))
+  })
+
+  it.each(['hbbs', 'hbbs:21116', 'localhost'])(
+    'shows a non-blocking host warning for %s',
+    async (host) => {
+      renderServerSettings()
+      const idHost = await screen.findByRole('textbox', { name: 'ID server host' })
+      fireEvent.change(idHost, { target: { value: host } })
+      expect(
+        screen.getByText(
+          `Clients on other machines can't reach ${host.split(':')[0]}. Use this server's LAN IP or DNS name.`,
+        ),
+      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save changes' })).toBeEnabled()
+    },
+  )
+
+  it('clears old reachability results after a successful save', async () => {
+    renderServerSettings()
+    fireEvent.click(await screen.findByRole('button', { name: 'Run checks' }))
+    expect(await screen.findByText('Reachability check results:')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    await screen.findByText('Server settings saved')
+    await waitFor(() => expect(screen.queryByText('Reachability check results:')).toBeNull())
+    expect(screen.getByText(/Click “Run checks”/)).toBeInTheDocument()
   })
 
   it('saves the connect link server switch', async () => {

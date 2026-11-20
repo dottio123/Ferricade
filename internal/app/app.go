@@ -52,7 +52,7 @@ const (
 
 	// shutdownTimeout is how long in-flight requests get to finish.
 	shutdownTimeout = 10 * time.Second
-	// insecureWarnEvery repeats the DEV_INSECURE warning.
+	// insecureWarnEvery repeats the ALLOW_HTTP warning.
 	insecureWarnEvery = 10 * time.Minute
 	// setupPollEvery is how often, before setup completes, the app checks
 	// whether it has, to start the online tracker.
@@ -257,7 +257,7 @@ func checkConfig(cfg config.Config) error {
 	case "https":
 	case "http":
 		if !cfg.DevInsecure {
-			return errors.New("PUBLIC_URL uses http: the admin console needs https (set DEV_INSECURE=1 only for a development or LAN test)")
+			return errors.New("PUBLIC_URL uses http: use https, or set ALLOW_HTTP=1 for a LAN-only install")
 		}
 	default:
 		return fmt.Errorf("PUBLIC_URL %q must be an https URL", cfg.PublicURL)
@@ -402,7 +402,7 @@ func (a *App) Close() {
 }
 
 func (a *App) warnInsecure() {
-	a.log.Warn("DEV_INSECURE=1: the admin console accepts plain HTTP, without Secure cookies or HSTS; use it only for a development or LAN test")
+	a.log.Warn("ALLOW_HTTP=1: the admin console is served over plain HTTP; logins and session cookies are not encrypted on the network")
 }
 
 // runTracker waits until setup is complete (the tracker needs the server

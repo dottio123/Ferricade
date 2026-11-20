@@ -143,7 +143,7 @@ func TestDevInsecureWarnsAtStartup(t *testing.T) {
 	t.Cleanup(a.Close)
 	warned := false
 	for _, r := range logs.records(t) {
-		if strings.HasPrefix(r["msg"].(string), "DEV_INSECURE=1") && r["level"] == "WARN" {
+		if strings.HasPrefix(r["msg"].(string), "ALLOW_HTTP=1:") && r["level"] == "WARN" {
 			warned = true
 		}
 	}

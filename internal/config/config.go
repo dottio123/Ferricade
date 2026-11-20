@@ -44,14 +44,14 @@ type Config struct {
 
 // Load reads CLIENT_LISTEN_ADDR, ADMIN_LISTEN_ADDR, HBBS_ADDR, DATABASE_URL,
 // PUBLIC_URL, TRUSTED_PROXIES, SECRET_KEY, MAX_PENDING_DEVICES,
-// DEV_INSECURE, LOG_LEVEL and LOG_FORMAT through getenv.
+// ALLOW_HTTP (or its legacy alias DEV_INSECURE), LOG_LEVEL and LOG_FORMAT through getenv.
 func Load(getenv func(string) string) (Config, error) {
 	c := Config{
 		ClientListenAddr:  or(getenv("CLIENT_LISTEN_ADDR"), DefaultClientListenAddr),
 		AdminListenAddr:   or(getenv("ADMIN_LISTEN_ADDR"), DefaultAdminListenAddr),
 		DatabaseURL:       strings.TrimSpace(getenv("DATABASE_URL")),
 		MaxPendingDevices: DefaultMaxPending,
-		DevInsecure:       strings.TrimSpace(getenv("DEV_INSECURE")) == "1",
+		DevInsecure:       strings.TrimSpace(getenv("ALLOW_HTTP")) == "1" || strings.TrimSpace(getenv("DEV_INSECURE")) == "1",
 	}
 	if c.DatabaseURL == "" {
 		return Config{}, errors.New("DATABASE_URL is required")
@@ -91,7 +91,7 @@ func Load(getenv func(string) string) (Config, error) {
 		return Config{}, errors.New("PUBLIC_URL must not use https on port 21114: RustDesk clients strip that port")
 	}
 	if u.Scheme == "http" && !c.DevInsecure {
-		return Config{}, errors.New("PUBLIC_URL uses http: set DEV_INSECURE=1 to allow it (development only), or use https")
+		return Config{}, errors.New("PUBLIC_URL uses http: use https, or set ALLOW_HTTP=1 for a LAN-only install")
 	}
 	c.PublicURL = u
 
@@ -162,7 +162,7 @@ func secretKey(v string) ([]byte, error) {
 		return nil, errors.New("SECRET_KEY is not valid base64")
 	}
 	if len(b) < minSecretKeyBytes {
-		return nil, fmt.Errorf("SECRET_KEY decodes to %d bytes, need at least %d", len(b), minSecretKeyBytes)
+		return nil, fmt.Errorf("SECRET_KEY decodes to %d bytes, need at least %d; generate one with: openssl rand -base64 32 (44 characters)", len(b), minSecretKeyBytes)
 	}
 	return b, nil
 }

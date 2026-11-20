@@ -7,10 +7,12 @@ import { clearIntroFlag, setIntroFlag } from '../../auth/intro-flag'
 import { leaveSignInWhenSignedIn, validateNextSearch } from '../../auth/guard'
 import { signInShown } from '../../auth/unauthorized'
 import { useSignIn } from '../../auth/signIn'
+import { usePlainHttp } from '../../auth/session'
 import { safeNext } from '../../auth/next'
 import { queryKeys } from '../../lib/queryKeys'
 import { oidcErrorMessage } from '../../components/auth/oidc-messages'
 import { Wordmark } from '../../components/brand/wordmark'
+import { PLAIN_HTTP_NOTICE } from '../../components/server/plain-http-indicator'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
@@ -38,6 +40,7 @@ function SignIn() {
     clearIntroFlag()
   }, [])
   const signIn = useSignIn(next)
+  const plainHttp = usePlainHttp()
 
   const { submit: handleSignIn, retried } = useBusyRetry(
     ({ username, password }: { username: string; password: string }) => {
@@ -125,6 +128,11 @@ function SignIn() {
               {signIn.isPending ? 'Signing in…' : 'Sign in'}
             </Button>
           </form>
+          {plainHttp && (
+            <p className="mt-4 text-center text-xs leading-relaxed text-muted-foreground">
+              {PLAIN_HTTP_NOTICE}
+            </p>
+          )}
         </CardContent>
       </Card>
     </main>

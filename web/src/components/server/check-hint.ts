@@ -8,7 +8,7 @@ export function checkHint(reason: Check['reason'], address: string, target: stri
     case 'refused':
       return `Nothing accepts connections at ${destination}. Is that the machine running the RustDesk server, with its ports published?`
     case 'timeout':
-      return `No answer from ${destination} within 3 seconds. Usually a firewall, a missing port forward, or a router without NAT loopback.`
+      return `No answer from ${destination} within 3 seconds. Usually a firewall, a missing port forward, or a router without NAT loopback. On Docker Desktop, this check can fail for the machine's own LAN address even when other machines reach it; test from another machine.`
     case 'unreachable':
       return `The network cannot reach ${destination}. Check routing or VPN.`
     default:

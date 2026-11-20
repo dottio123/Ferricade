@@ -109,12 +109,12 @@ func TestUIHasCSP(t *testing.T) {
 }
 
 func TestSetupStatus(t *testing.T) {
-	e := newEnv(t, withUI(uiFS()))
+	e := newEnv(t, withUI(uiFS()), func(d *Deps) { d.Cfg.DevInsecure = false })
 	c := e.client()
 	rec := c.do(http.MethodGet, "/setup/status", nil)
 	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 	require.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
-	require.Equal(t, false, decodeBody(t, rec)["setup_complete"])
+	require.Equal(t, map[string]any{"setup_complete": false, "plain_http": false}, decodeBody(t, rec))
 
 	e.markSetupComplete()
 	rec = c.do(http.MethodGet, "/setup/status", nil)
@@ -124,6 +124,13 @@ func TestSetupStatus(t *testing.T) {
 
 	// The other setup routes are still gone.
 	requireError(t, c.setup("/owner", ownerBody), http.StatusNotFound, "not_found")
+}
+
+func TestSetupStatusPlainHTTP(t *testing.T) {
+	e := newEnv(t, withUI(uiFS()), func(d *Deps) { d.Cfg.DevInsecure = true })
+	rec := e.client().do(http.MethodGet, "/setup/status", nil)
+	require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+	require.Equal(t, true, decodeBody(t, rec)["plain_http"])
 }
 
 // Files at the root of the build (favicon, robots.txt, the manifest) and in

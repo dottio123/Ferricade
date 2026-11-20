@@ -52,19 +52,30 @@ cp deploy/.env.example deploy/.env
 # Set FERRICADE_VERSION, SECRET_KEY, PUBLIC_URL, and POSTGRES_PASSWORD.
 # Generate SECRET_KEY with openssl rand -base64 32.
 # Generate POSTGRES_PASSWORD with openssl rand -hex 24.
+# To run hbbs and hbbr here, set COMPOSE_PROFILES=rustdesk and fill RELAY_HOST and HBBS_ADDR in deploy/.env.
 docker compose --env-file deploy/.env -f deploy/compose.yml up -d
 docker compose --env-file deploy/.env -f deploy/compose.yml logs app | grep 'setup token'
 ```
 
+In PowerShell, generate the secrets and read the setup token with:
+
+```powershell
+openssl rand -base64 32 # SECRET_KEY
+openssl rand -hex 24    # POSTGRES_PASSWORD
+docker compose --env-file deploy/.env -f deploy/compose.yml logs app | Select-String 'setup token'
+```
+
 For production, set `PUBLIC_URL` to the HTTPS URL served by your reverse proxy.
-For a local HTTP trial, use [deploy/compose.dev.yml](deploy/compose.dev.yml) as
-described in [the development guide](docs/guide.md).
+For a LAN-only install without a reverse proxy, set `ALLOW_HTTP=1`, use an HTTP
+`PUBLIC_URL` such as `http://<host IP>:21120`, and set `ADMIN_BIND=0.0.0.0` (or
+the host's LAN IP) to reach it from other machines. Traffic, including logins,
+is unencrypted; never use this on the internet. The console shows a warning.
 
 ### First run
 
-1. Open `<PUBLIC_URL>/first-run` and enter the setup token from the app log.
+1. Open `<PUBLIC_URL>/first-run` from exactly `PUBLIC_URL`; sign-in is refused from any other address. Enter the setup token from the app log.
 2. Create the owner account and enroll an authenticator for TOTP.
-3. Enter the RustDesk ID host, relay host, and public server key.
+3. When using the included RustDesk servers, use the same LAN IP or DNS name from `RELAY_HOST` for both ID host and relay host; leave Client API address blank and enter the public key from the hbbs log.
 4. Finish setup and copy the client configuration shown by Ferricade.
 5. Import the configuration in RustDesk or use the generated install command.
 6. Wait for a device to report in, then approve it in the console.
@@ -90,21 +101,32 @@ admin API behind an HTTPS reverse proxy.
 | 21117/tcp | `hbbr` | Relay traffic |
 | 21120/tcp | Ferricade admin API | Admin console and setup behind HTTPS |
 
-Clients need the client API and RustDesk server ports. Open the console at the
-HTTPS URL in `PUBLIC_URL`. Port 21120 is an internal HTTP listener and does not
-need to be public. RustDesk clients derive the API address on 21114, which uses
-plain HTTP.
+Clients need the client API and RustDesk server ports. Use `PUBLIC_URL` as the
+console origin; sign-in is refused from any other address. Port 21120 is an
+internal HTTP listener and does not need to be public. RustDesk clients derive
+the API address on 21114, which uses plain HTTP.
 
-To run `hbbs` and `hbbr` in the same Compose project, download
-`deploy/compose.rustdesk.yml`, set `RELAY_HOST` to the address clients use for
-the relay, and set `HBBS_ADDR=hbbs:21115`. Start both files together:
+To run `hbbs` and `hbbr` in the same Compose project, set
+`COMPOSE_PROFILES=rustdesk`, `RELAY_HOST` to the address clients reach, and
+`HBBS_ADDR=hbbs:21115` in `deploy/.env`. These three settings go together.
+In Arcane, deleting this project with its volumes also deletes `ferricade_pgdata`
+and every device, user, and audit entry; back up the database first.
+Read the hbbs public key with:
 
 ```sh
-docker compose --env-file deploy/.env -f deploy/compose.yml -f deploy/compose.rustdesk.yml up -d
+docker compose --env-file deploy/.env -f deploy/compose.yml logs hbbs | grep Key
 ```
 
+In PowerShell, use `Select-String`:
+
+```powershell
+docker compose --env-file deploy/.env -f deploy/compose.yml logs hbbs | Select-String Key
+```
+
+Older setups still work with `-f compose.rustdesk.yml`.
+
 The included servers use key authentication. Their public key is created in
-the persistent `rustdesk-data` volume. Enter it during first-run setup and
+the persistent `ferricade_rustdesk-data` volume. Enter it during first-run setup and
 configure it on each RustDesk client. If you already run `hbbs` and `hbbr`,
 keep the first Compose command and set `HBBS_ADDR` to your `hbbs` host.
 
@@ -124,7 +146,7 @@ helps someone else. Issues and pull requests are welcome.
 
 ## Compatibility
 
-Ferricade is stable at version 2.1.1 and has been tested with stock RustDesk
+Ferricade is stable at version 2.2.0 and has been tested with stock RustDesk
 1.5.0 clients. The admin console serves the web UI from the same origin as its
 API.
 

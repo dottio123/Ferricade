@@ -59,12 +59,18 @@ test.describe('Settings pages and client config', () => {
 
     // 3. Restore valid key and update ID host
     await pubKeyInput.fill(originalKey)
-    await page.getByLabel('ID server host').fill('rd.testdomain.local')
+    await page.getByLabel('ID server host').fill('hbbs')
+    await expect(
+      page.getByText(
+        "Clients on other machines can't reach hbbs. Use this server's LAN IP or DNS name.",
+      ),
+    ).toBeVisible()
     await page.getByRole('button', { name: 'Save changes' }).click()
 
     await expect(
       page.locator('[data-slot="toast-title"]', { hasText: 'Server settings saved' }),
     ).toBeVisible()
+    await expect(page.getByText('Reachability check results:')).toHaveCount(0)
   })
 
   test('updates password and toggles TOTP re-enrollment on account settings', async ({ page }) => {

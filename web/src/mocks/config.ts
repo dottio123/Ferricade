@@ -1,6 +1,6 @@
 // The mock's behaviour switches. In the browser they come from the page URL
-// (?mock=, ?mock-delay=, ?mock-fail=, ?mock-role=, ?mock-grants=, ?mock-setup=, ?mock-session=); tests call
-// readMockConfig with a query string directly.
+// (?mock=, ?mock-delay=, ?mock-fail=, ?mock-role=, ?mock-grants=, ?mock-setup=, ?mock-session=, ?mock-http=);
+// tests call readMockConfig with a query string directly.
 
 export type MockSize = 'small' | 'medium' | 'large'
 export type MockRole = 'owner' | 'admin' | 'user'
@@ -23,6 +23,8 @@ export interface MockConfig {
   /** The session the mock starts with. */
   session: MockSessionStart
   oidc: boolean
+  /** GET /setup/status reports plain_http: true (simulating ALLOW_HTTP). */
+  plainHttp: boolean
 }
 
 export function readMockConfig(search: string): MockConfig {
@@ -43,6 +45,7 @@ export function readMockConfig(search: string): MockConfig {
     setupIncomplete: q.get('mock-setup') === 'incomplete',
     session: sessionStart(q.get('mock-session')),
     oidc: q.get('mock-oidc') === 'on',
+    plainHttp: q.get('mock-http') === 'plain',
   }
 }
 

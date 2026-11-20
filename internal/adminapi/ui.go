@@ -127,5 +127,6 @@ func (a *api) setupStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, struct {
 		SetupComplete bool `json:"setup_complete"`
-	}{done})
+		PlainHTTP     bool `json:"plain_http"`
+	}{done, a.d.Cfg.DevInsecure})
 }

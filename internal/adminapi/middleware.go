@@ -221,8 +221,21 @@ func safeMethod(m string) bool { return m == http.MethodGet || m == http.MethodH
 func (a *api) checkOrigin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !safeMethod(r.Method) && !a.sameOrigin(r) {
-			a.log.Log(r.Context(), a.securityRejectLevel(r), "origin rejected", "route", routePattern(r), "ip", a.logIP(r), "request_id", requestIDFrom(r.Context()))
-			writeError(w, http.StatusForbidden, codeCSRF, "request origin does not match the console")
+			got := r.Header.Get("Origin")
+			if got == "" {
+				got = r.Header.Get("Referer")
+			}
+			if u, err := url.Parse(got); err == nil {
+				got = origin(u)
+			} else {
+				got = ""
+			}
+			expected := ""
+			if a.d.Cfg.PublicURL != nil {
+				expected = origin(a.d.Cfg.PublicURL)
+			}
+			a.log.Log(r.Context(), a.securityRejectLevel(r), "origin rejected", "route", routePattern(r), "ip", a.logIP(r), "request_id", requestIDFrom(r.Context()), "expected", expected, "got", got)
+			writeError(w, http.StatusForbidden, codeCSRF, "request origin does not match the console; open it at "+expected)
 			return
 		}
 		next.ServeHTTP(w, r)

@@ -14,10 +14,12 @@ For an overview, see the [README](../README.md). Release changes are in the
 | 21116 | TCP and UDP | `hbbs` ID and rendezvous server | RustDesk clients |
 | 21117 | TCP | `hbbr` relay | RustDesk clients |
 
-`deploy/compose.yml` runs Ferricade and PostgreSQL 16. Add
-`deploy/compose.rustdesk.yml` when the same Compose project should run `hbbs`
-and `hbbr`; omit it when a RustDesk server already exists. The included
-RustDesk server stores its key in the persistent `rustdesk-data` volume.
+`deploy/compose.yml` runs Ferricade and PostgreSQL 16. Set
+`COMPOSE_PROFILES=rustdesk`, `RELAY_HOST` to the address clients reach, and
+`HBBS_ADDR=hbbs:21115` together in `.env` to also run `hbbs` and `hbbr` in this
+project. Otherwise leave the profile disabled and set `HBBS_ADDR` to your
+existing server. The included RustDesk server stores its key in the persistent
+`ferricade_rustdesk-data` volume.
 
 RustDesk clients need the client API and RustDesk server ports. Admin access
 uses the HTTPS URL configured as `PUBLIC_URL`. Port 21120 is an internal HTTP
@@ -43,8 +45,17 @@ docker compose --env-file deploy/.env -f deploy/compose.yml up -d
 docker compose --env-file deploy/.env -f deploy/compose.yml logs app | grep 'setup token'
 ```
 
-Open `<PUBLIC_URL>/first-run` and enter the token. The setup wizard creates
-the owner, enrolls TOTP, checks the RustDesk server, and shows the client
+In PowerShell, generate the secrets and read the setup token with:
+
+```powershell
+openssl rand -base64 32 # SECRET_KEY
+openssl rand -hex 24    # POSTGRES_PASSWORD
+docker compose --env-file deploy/.env -f deploy/compose.yml logs app | Select-String 'setup token'
+```
+
+Use `PUBLIC_URL` as the console origin; sign-in is refused from any other
+address. Open its `/first-run` page and enter the token. The setup wizard creates the owner, enrolls
+TOTP, checks the RustDesk server, and shows the client
 configuration. A token is valid for 24 hours; restarting the service issues a
 new token. The `/setup` routes return 404 after setup completes.
 
@@ -53,13 +64,23 @@ installation. `SECRET_KEY` encrypts stored TOTP and single sign-on secrets.
 Changing `POSTGRES_PASSWORD` in the environment does not change the password
 in an existing database volume.
 
-To run the RustDesk servers in the same Compose project, set `RELAY_HOST` to
-the address clients use for `hbbr` and set `HBBS_ADDR=hbbs:21115`. Include the
-RustDesk Compose file when starting the stack:
+To run the RustDesk servers, set `COMPOSE_PROFILES=rustdesk`, `RELAY_HOST` to
+the address clients reach, and `HBBS_ADDR=hbbs:21115` together in `.env`. Read
+the hbbs public key with:
 
 ```sh
-docker compose --env-file deploy/.env -f deploy/compose.yml -f deploy/compose.rustdesk.yml up -d
+docker compose --env-file deploy/.env -f deploy/compose.yml logs hbbs | grep Key
 ```
+
+In PowerShell, use `Select-String`:
+
+```powershell
+docker compose --env-file deploy/.env -f deploy/compose.yml logs hbbs | Select-String Key
+```
+
+In the setup wizard, use the value of `RELAY_HOST` for both ID host and relay
+host, and the public key from the hbbs log for the key. Older setups still
+work with `-f compose.rustdesk.yml`.
 
 The included servers use key authentication. The public key is created in the
 `rustdesk-data` volume. Enter the content of `id_ed25519.pub` during setup and
@@ -134,9 +155,10 @@ not change its stored password.
 |---|---|---|---|
 | `DATABASE_URL` | Yes | Set by Compose | PostgreSQL connection URL. |
 | `SECRET_KEY` | Yes | None | Base64 encoding of at least 32 random bytes. Encrypts stored TOTP and single sign-on secrets. |
-| `PUBLIC_URL` | Yes | None | External console URL. HTTPS unless `DEV_INSECURE=1`; HTTPS on port 21114 is not allowed. |
-| `DEV_INSECURE` | No | Unset | Allows HTTP `PUBLIC_URL` for development and trusted LAN tests. |
-| `HBBS_ADDR` | No | Disabled | `host[:port]` for `hbbs`, usually port 21115. Online queries run every 60 seconds for approved devices without a recent heartbeat. Do not use a loopback address. With `compose.rustdesk.yml`, use `hbbs:21115`. |
+| `PUBLIC_URL` | Yes | None | External console URL. HTTPS unless `ALLOW_HTTP=1`; HTTPS on port 21114 is not allowed. |
+| `ALLOW_HTTP` | No | Unset | Allows HTTP `PUBLIC_URL` for LAN-only installs; traffic, including logins, is unencrypted. |
+| `DEV_INSECURE` | No | Unset | Older name for ALLOW_HTTP. |
+| `HBBS_ADDR` | No | Disabled | `host[:port]` for `hbbs`, usually port 21115. Online queries run every 60 seconds for approved devices without a recent heartbeat. Do not use a loopback address. With the included RustDesk servers, use `hbbs:21115`. |
 | `TRUSTED_PROXIES` | No | Empty | Comma-separated CIDRs allowed to provide `X-Forwarded-For`. Use the proxy's single source address. |
 | `MAX_PENDING_DEVICES` | No | `500` | Stops recording unknown devices when this many are pending. |
 | `CLIENT_LISTEN_ADDR` | No | `:21114` | Client API listener address. |
@@ -207,6 +229,9 @@ setup -X POST "$ADMIN/setup/complete" | jq
 The server profile is saved even when a reachability check fails. The checks
 cover the ID server, relay, client API, and the configured online query. For
 request and response schemas, see the [API contract](../internal/adminapi/openapi.yaml).
+On Docker Desktop for Windows or macOS, these checks run inside the container
+and may not reach this machine's own LAN address even when other machines can.
+Test from another machine with `Test-NetConnection <host> -Port 21116`.
 
 ## Configure RustDesk clients
 
@@ -369,7 +394,7 @@ readable `message`. For example:
   "user": {"id": "<user-id>", "name": "Operator", "roles": ["admin"]},
   "source": {"ip": "<client-address>"},
   "ferricade": {"target": {"type": "device", "id": "<device-id>", "name": "Example device"}, "device": {"rustdesk_id": "123456789"}, "details": {}},
-  "observer": {"product": "Ferricade", "version": "2.1.1", "hostname": "admin.example.com"}
+  "observer": {"product": "Ferricade", "version": "2.2.0", "hostname": "admin.example.com"}
 }
 ```
 

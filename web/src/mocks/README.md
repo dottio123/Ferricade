@@ -25,6 +25,7 @@ call `readMockConfig('?mock=small')` directly).
 | `?mock-session=signed-out`   | nobody is signed in (the default is signed in with MFA passed)                                                                                                                                                              |
 | `?mock-session=mfa`          | signed in, TOTP not passed yet (the app shows `/sign-in/totp`)                                                                                                                                                              |
 | `?mock-session=enroll`       | signed in, TOTP required but not set up (the app shows `/enroll-totp`)                                                                                                                                                      |
+| `?mock-http=plain`           | `GET /setup/status` answers `plain_http: true` (as when `ALLOW_HTTP=1` is set)                                                                                                                                              |
 
 Switches combine: `?mock=large&mock-delay=400&mock-fail=listSessions`.
 

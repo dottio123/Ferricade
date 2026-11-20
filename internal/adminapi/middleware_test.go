@@ -1,16 +1,20 @@
 package adminapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/dottio123/ferricade/internal/auth"
+	"github.com/dottio123/ferricade/internal/config"
 )
 
 func TestCSRFRequired(t *testing.T) {
@@ -47,6 +51,32 @@ func TestCSRFRequired(t *testing.T) {
 	// GET is exempt.
 	c.origin = "https://evil.example.com"
 	requireError(t, c.do(http.MethodGet, apiPrefix+"/auth/me", nil), http.StatusUnauthorized, "unauthenticated")
+}
+
+func TestOriginRejectionExplainsExpectedOrigin(t *testing.T) {
+	var logs bytes.Buffer
+	publicURL, err := url.Parse("https://console.example.com/admin")
+	require.NoError(t, err)
+	a := newAPI(Deps{Cfg: config.Config{PublicURL: publicURL}, Log: slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))})
+	h := a.checkOrigin(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { t.Fatal("handler should not run") }))
+	req := httptest.NewRequest(http.MethodPost, "/admin/api/v1/auth/login", nil)
+	req.Header.Set("Referer", "https://wrong.example/path?secret=value")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusForbidden, rec.Code)
+	var body struct {
+		Error struct {
+			Code, Message string
+		}
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Equal(t, codeCSRF, body.Error.Code)
+	require.Equal(t, "request origin does not match the console; open it at https://console.example.com", body.Error.Message)
+	require.Contains(t, logs.String(), `expected=https://console.example.com`)
+	require.Contains(t, logs.String(), `got=https://wrong.example`)
+	require.NotContains(t, logs.String(), "/path")
+	require.NotContains(t, logs.String(), "secret=value")
 }
 
 func TestSecurityHeaders(t *testing.T) {

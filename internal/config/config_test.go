@@ -106,9 +106,10 @@ func TestLoadSecretKeyEncodings(t *testing.T) {
 }
 
 func TestLoadSecretKeyTooShort(t *testing.T) {
-	_, err := config.Load(env(base(map[string]string{"SECRET_KEY": base64.StdEncoding.EncodeToString(make([]byte, 31))})))
+	_, err := config.Load(env(base(map[string]string{"SECRET_KEY": base64.StdEncoding.EncodeToString(make([]byte, 24))})))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "SECRET_KEY")
+	assert.Contains(t, err.Error(), "openssl rand -base64 32")
 
 	_, err = config.Load(env(base(map[string]string{"SECRET_KEY": "not base64 !!"})))
 	require.Error(t, err)
@@ -119,12 +120,16 @@ func TestLoadSecretKeyTooShort(t *testing.T) {
 	assert.Contains(t, err.Error(), "SECRET_KEY")
 }
 
-func TestLoadHTTPPublicURLNeedsDevInsecure(t *testing.T) {
+func TestLoadHTTPPublicURLNeedsAllowHTTP(t *testing.T) {
 	_, err := config.Load(env(base(map[string]string{"PUBLIC_URL": "http://a.example.com"})))
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "DEV_INSECURE")
+	assert.EqualError(t, err, "PUBLIC_URL uses http: use https, or set ALLOW_HTTP=1 for a LAN-only install")
 
-	c, err := config.Load(env(base(map[string]string{"PUBLIC_URL": "http://a.example.com", "DEV_INSECURE": "1"})))
+	c, err := config.Load(env(base(map[string]string{"PUBLIC_URL": "http://a.example.com", "ALLOW_HTTP": "1"})))
+	require.NoError(t, err)
+	assert.True(t, c.DevInsecure)
+
+	c, err = config.Load(env(base(map[string]string{"PUBLIC_URL": "http://a.example.com", "DEV_INSECURE": "1"})))
 	require.NoError(t, err)
 	assert.True(t, c.DevInsecure)
 

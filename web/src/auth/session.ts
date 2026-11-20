@@ -26,3 +26,9 @@ export const setupStatusQuery = queryOptions({
 export function useMe() {
   return useQuery(meQuery)
 }
+
+/** Whether GET /setup/status reported plain HTTP (ALLOW_HTTP). */
+export function usePlainHttp(): boolean {
+  const { data } = useQuery(setupStatusQuery)
+  return data?.plain_http === true
+}

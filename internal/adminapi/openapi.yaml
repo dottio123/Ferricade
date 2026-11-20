@@ -5,7 +5,7 @@ info:
   description: |
     The admin console's JSON API (/admin/api/v1) and first-run setup wizard (/setup).
 
-    Every response carries Strict-Transport-Security (except in DEV_INSECURE mode),
+    Every response carries Strict-Transport-Security (except in ALLOW_HTTP mode),
     Content-Security-Policy, X-Content-Type-Options, Referrer-Policy,
     Cross-Origin-Opener-Policy and X-Request-ID; API responses also carry
     Cache-Control: no-store.
@@ -56,7 +56,7 @@ components:
       type: apiKey
       in: cookie
       name: __Host-ferricade_session
-      description: Session cookie (named ferricade_session in DEV_INSECURE mode).
+      description: Session cookie (named ferricade_session in ALLOW_HTTP mode).
     csrf:
       type: apiKey
       in: header
@@ -1473,7 +1473,7 @@ paths:
         https (http://localhost and http://127.0.0.1 are allowed for testing). Turning it on
         needs an issuer, a client ID, a client secret and at least one owner, admin or user group.
         Audited as settings.oidc_updated with the names of the changed fields (never the secret).
-        In DEV_INSECURE mode any http issuer is allowed.
+        In ALLOW_HTTP mode any http issuer is allowed.
         Roles from groups: owner if any owner group matches, else admin, else user; no match refuses the sign-in.
       requestBody:
         required: true
@@ -1590,10 +1590,14 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [setup_complete]
+                required: [setup_complete, plain_http]
                 additionalProperties: false
                 properties:
                   setup_complete: {type: boolean}
+                  plain_http:
+                    type: boolean
+                    description: The console is served over plain HTTP (ALLOW_HTTP); the UI shows a warning.
+                example: {setup_complete: true, plain_http: false}
         '500': {$ref: '#/components/responses/Internal'}
 
   /setup/owner:

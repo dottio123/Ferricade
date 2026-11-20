@@ -10,6 +10,7 @@ import { CopyField } from '@/components/brand/copy-field'
 import { ClientConfig } from '@/components/client-config'
 import { PasswordRules, passwordRulesMet } from '@/components/password-rules'
 import { ServerChecks } from '@/components/server/server-checks'
+import { serverHostWarning } from '@/components/server/server-host-hint'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -572,6 +573,9 @@ function FirstRunWizard() {
                       placeholder="rd.example.com"
                       required
                     />
+                    {serverHostWarning(idHost) && (
+                      <p className="text-xs text-muted-foreground">{serverHostWarning(idHost)}</p>
+                    )}
                     <span className="text-xs text-muted-foreground">
                       Suggested from current host
                     </span>
@@ -594,6 +598,11 @@ function FirstRunWizard() {
                       placeholder="rd.example.com"
                       required
                     />
+                    {serverHostWarning(relayHost) && (
+                      <p className="text-xs text-muted-foreground">
+                        {serverHostWarning(relayHost)}
+                      </p>
+                    )}
                     <span className="text-xs text-muted-foreground">
                       Suggested from current host
                     </span>

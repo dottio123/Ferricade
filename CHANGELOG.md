@@ -4,6 +4,19 @@ All notable changes to Ferricade are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Ferricade uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-11-20
+
+### Added
+
+- Opt-in plain HTTP for LAN-only installs with a console warning.
+- Quiet plain-HTTP indicator in the console header and sign-in page when served over HTTP.
+
+### Changed
+
+- Server settings and first-run setup now warn when clients cannot reach a local or container-only host.
+- Origin failures identify the configured console address on the sign-in page.
+- The production Compose file includes hbbs and hbbr behind the `rustdesk` profile; older two-file setups still work.
+
 ## [2.1.1] - 2026-11-20
 
 ### Changed

@@ -16,7 +16,13 @@ describe('checkHint', () => {
 
   it('explains timeouts with the address', () => {
     expect(checkHint('timeout', '192.0.2.1:21116', 'rd.example.com:21116')).toBe(
-      'No answer from 192.0.2.1:21116 within 3 seconds. Usually a firewall, a missing port forward, or a router without NAT loopback.',
+      "No answer from 192.0.2.1:21116 within 3 seconds. Usually a firewall, a missing port forward, or a router without NAT loopback. On Docker Desktop, this check can fail for the machine's own LAN address even when other machines reach it; test from another machine.",
+    )
+  })
+
+  it('does not add the Docker Desktop note to refused connections', () => {
+    expect(checkHint('refused', '192.0.2.1:21116', 'rd.example.com:21116')).not.toContain(
+      'Docker Desktop',
     )
   })
 

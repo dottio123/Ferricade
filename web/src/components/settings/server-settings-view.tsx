@@ -6,6 +6,7 @@ import { useMe } from '@/auth/session'
 import { CopyField } from '@/components/brand/copy-field'
 import { ErrorState } from '@/components/brand/error-state'
 import { ServerChecks, type Check } from '@/components/server/server-checks'
+import { serverHostWarning, serverHostWithoutPort } from '@/components/server/server-host-hint'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -45,6 +46,8 @@ function ServerForm({ initial, isOwner }: ServerFormProps) {
   const [generalError, setGeneralError] = React.useState<string | null>(null)
 
   const [checks, setChecks] = React.useState<Check[] | null>(null)
+  const idHostWarning = serverHostWarning(idHost)
+  const relayHostWarning = serverHostWarning(relayHost)
 
   const updateMutation = useMutation({
     mutationFn: () =>
@@ -61,6 +64,7 @@ function ServerForm({ initial, isOwner }: ServerFormProps) {
         }),
       ),
     onSuccess: (saved) => {
+      setChecks(null)
       setKeyError(null)
       setGeneralError(null)
       setName(saved.name)
@@ -157,6 +161,7 @@ function ServerForm({ initial, isOwner }: ServerFormProps) {
                   disabled={!isOwner || updateMutation.isPending}
                   required
                 />
+                {idHostWarning && <p className="text-xs text-muted-foreground">{idHostWarning}</p>}
               </div>
 
               <div className="flex flex-col gap-1.5">
@@ -175,6 +180,9 @@ function ServerForm({ initial, isOwner }: ServerFormProps) {
                   disabled={!isOwner || updateMutation.isPending}
                   required
                 />
+                {relayHostWarning && (
+                  <p className="text-xs text-muted-foreground">{relayHostWarning}</p>
+                )}
               </div>
             </div>
 
@@ -189,8 +197,11 @@ function ServerForm({ initial, isOwner }: ServerFormProps) {
                 value={apiUrl}
                 onChange={(e) => setApiUrl(e.target.value)}
                 disabled={!isOwner || updateMutation.isPending}
-                placeholder="https://rustdesk-api.example.com"
+                placeholder="Leave blank for the default"
               />
+              <p className="text-xs text-muted-foreground">
+                Using {apiUrl.trim() || `http://${serverHostWithoutPort(idHost)}:21114`}
+              </p>
               <p id="server-api-url-help" className="text-xs text-muted-foreground">
                 Leave blank for http://&lt;ID server&gt;:21114. Use an https address when a TLS
                 proxy serves the client API.
