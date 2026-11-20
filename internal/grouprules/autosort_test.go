@@ -227,12 +227,23 @@ func TestAutoSortLargeFleet(t *testing.T) {
 // observed waiting on database locks, rather than relying on scheduler timing.
 func TestAutoSortConcurrentRunsSerialize(t *testing.T) {
 	e := newSortEnv(t)
+	cfg := e.Pool.Config()
+	// Keep this regression at the four-connection limit used by GitHub's runner.
+	cfg.MaxConns = 4
+	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	require.NoError(t, err)
+	t.Cleanup(pool.Close)
+	e.Service.Pool = pool
 	g := e.group(t, "Target", "pc-*")
 	approved := e.device(t, "pc-approved", "approved", nil)
 	pending := e.device(t, "pc-pending", "pending", nil)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	_, err := e.Pool.Exec(ctx, `CREATE FUNCTION hold_sort_move() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock(145,1); RETURN NEW; END $$; CREATE TRIGGER hold_sort_move BEFORE UPDATE OF group_id ON devices FOR EACH ROW EXECUTE FUNCTION hold_sort_move()`)
+	// The observer must not compete with the approval connection it is measuring.
+	monitor, err := pgx.ConnectConfig(ctx, e.Pool.Config().ConnConfig.Copy())
+	require.NoError(t, err)
+	defer monitor.Close(context.Background())
+	_, err = e.Pool.Exec(ctx, `CREATE FUNCTION hold_sort_move() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_advisory_xact_lock(145,1); RETURN NEW; END $$; CREATE TRIGGER hold_sort_move BEFORE UPDATE OF group_id ON devices FOR EACH ROW EXECUTE FUNCTION hold_sort_move()`)
 	require.NoError(t, err)
 	barrier, err := e.Pool.Begin(ctx)
 	require.NoError(t, err)
@@ -248,7 +259,9 @@ func TestAutoSortConcurrentRunsSerialize(t *testing.T) {
 	go func() { r, err := e.AutoSort(ctx, e.a); done <- outcome{0, r, err} }()
 	waitLocks := func(n int) {
 		require.Eventually(t, func() bool {
-			return count(t, e.Pool, `SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'`) >= n
+			var waiting int
+			err := monitor.QueryRow(ctx, `SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'`).Scan(&waiting)
+			return err == nil && waiting >= n
 		}, 3*time.Second, 10*time.Millisecond)
 	}
 	waitLocks(1)

@@ -251,8 +251,21 @@ func TestHubGetsDatabaseAndTrackerEvents(t *testing.T) {
 
 	var deviceID string
 	require.NoError(t, pool.QueryRow(ctx, `SELECT id::text FROM devices WHERE rustdesk_id = '424242'`).Scan(&deviceID))
-	assert.Equal(t, events.Event{Type: events.TypeDeviceEnrolled, DeviceID: deviceID}, waitFor(t, ch, events.TypeDeviceEnrolled))
-	assert.Equal(t, events.Event{Type: events.TypeDeviceOnline, DeviceID: deviceID}, waitFor(t, ch, events.TypeDeviceOnline))
+	got := make(map[string]events.Event, 2)
+	deadline := time.After(10 * time.Second)
+	for len(got) < 2 {
+		select {
+		case event, ok := <-ch:
+			require.True(t, ok, "subscription closed")
+			if event.Type == events.TypeDeviceEnrolled || event.Type == events.TypeDeviceOnline {
+				got[event.Type] = event
+			}
+		case <-deadline:
+			t.Fatal("did not receive enrollment and online events within 10 s")
+		}
+	}
+	assert.Equal(t, events.Event{Type: events.TypeDeviceEnrolled, DeviceID: deviceID}, got[events.TypeDeviceEnrolled])
+	assert.Equal(t, events.Event{Type: events.TypeDeviceOnline, DeviceID: deviceID}, got[events.TypeDeviceOnline])
 }
 
 // TestHubGetsSessionUpdated: a connection's auth record, after its "new",

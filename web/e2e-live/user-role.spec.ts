@@ -86,7 +86,7 @@ test('an owner grants a User one live device, then removes it by moving the devi
       await expect(create).toHaveCount(0)
       await owner.getByRole('button', { name: `Assign devices to ${USER.username}` }).click()
       const assign = owner.locator('[data-slot="assign-devices-dialog"]')
-      await assign.getByRole('checkbox', { name: GROUP }).check()
+      await assign.getByRole('checkbox', { name: GROUP, exact: true }).check()
       await assign.getByRole('button', { name: 'Save' }).click()
       await expect(owner.getByText('Assigned devices saved', { exact: true })).toBeVisible()
     })
