@@ -37,7 +37,7 @@ export function ServerChecks({ checks, isRunning, className }: ServerChecksProps
           className,
         )}
       >
-        <Loader2Icon className="size-4 animate-spin text-primary" />
+        <Loader2Icon className="size-4 animate-spin text-primary-text" />
         <span>Testing server reachability…</span>
       </div>
     )

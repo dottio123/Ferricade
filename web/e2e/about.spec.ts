@@ -59,7 +59,10 @@ test('About dialog opens from sidebar, switches changelog releases, and restores
   await expect(dialog).toBeHidden()
   await expect(about).toBeFocused()
 
-  await page.getByRole('button', { name: 'Collapse sidebar' }).click()
+  await page.getByRole('button', { name: 'Unpin sidebar' }).click()
+  await page.mouse.move(500, 500)
+  await page.evaluate(() => (document.activeElement as HTMLElement).blur())
+  await expect(page.getByRole('button', { name: 'Pin sidebar' })).toBeHidden()
   await expect(page.getByRole('button', { name: 'About' })).toHaveAttribute('aria-label', 'About')
 })
 

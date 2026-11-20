@@ -4,6 +4,22 @@ All notable changes to Ferricade are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Ferricade uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-11-20
+
+### Added
+
+- Ferricade logos, app icons, a sign-in introduction, and a full-page loader.
+- Sidebar pinning with automatic collapse.
+
+### Changed
+
+- Brand marks adapt to the active theme, and Ferricade is the default palette.
+- About shows recent releases, while tag labels use readable text colours.
+
+### Fixed
+
+- Clearing a device alias or note now saves the empty value.
+
 ## [2.0.0] - 2026-11-18
 
 ### Breaking (2.0.0)

@@ -179,7 +179,7 @@ function DevicesQueuePage() {
                           checked={isSelected}
                           onChange={() => handleToggleSelect(device.id)}
                           disabled={isBulkRunning || isApproved}
-                          className="mt-1 size-4 rounded border-input text-primary focus:ring-ring cursor-pointer shrink-0"
+                          className="mt-1 size-4 rounded border-input text-primary-text focus:ring-ring cursor-pointer shrink-0"
                         />
                         <div className="flex flex-col gap-0.5 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">

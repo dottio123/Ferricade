@@ -48,7 +48,7 @@ export function DeviceLink({
         onClick?.(e)
       }}
       className={cn(
-        'rounded-xs font-medium text-foreground hover:text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
+        'rounded-xs font-medium text-foreground hover:text-primary-text hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
         className,
       )}
       {...props}

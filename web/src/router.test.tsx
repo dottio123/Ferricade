@@ -1,5 +1,5 @@
 import { createMemoryHistory } from '@tanstack/react-router'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { setupServer } from 'msw/node'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { App } from './App'
@@ -25,9 +25,11 @@ let stopServer: () => void = () => {}
 
 beforeEach(() => {
   vi.stubGlobal('EventSource', SilentEventSource)
+  localStorage.clear()
 })
 
 afterEach(() => {
+  vi.useRealTimers()
   cleanup()
   stopServer()
   vi.unstubAllGlobals()
@@ -415,10 +417,15 @@ describe('the shell navigation', () => {
     ])
   })
 
-  it('keeps every link named when the sidebar is collapsed', async () => {
+  it('keeps every link named when the sidebar is unpinned and collapsed', async () => {
     renderAt('/devices')
     await heading('Devices')
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Unpin sidebar' }))
+    expect(screen.getByRole('button', { name: 'Pin sidebar' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+    expect(localStorage.getItem('ferricade.sidebar.pinned')).toBe('false')
     for (const name of [
       'Command Center',
       'Devices',
@@ -431,6 +438,58 @@ describe('the shell navigation', () => {
       expect(within(nav()).getByRole('link', { name: new RegExp(`^${name}`) })).toBeInTheDocument()
     }
     expect(screen.getByRole('link', { name: /^System Settings/ })).toBeInTheDocument()
+  })
+
+  it('keeps the unpinned sidebar open until focus leaves, then closes after the delay', async () => {
+    localStorage.setItem('ferricade.sidebar.pinned', 'false')
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    renderAt('/devices')
+    await heading('Devices')
+    const sidebar = screen.getByRole('navigation', { name: 'Main' }).closest('aside')!
+    expect(sidebar).toHaveClass('w-16')
+    const link = within(sidebar).getByRole('link', { name: /^Devices/ })
+    act(() => link.focus())
+    expect(screen.getByRole('button', { name: 'Pin sidebar' })).toBeInTheDocument()
+    expect(sidebar).toHaveClass('w-16')
+    document.body.tabIndex = -1
+    act(() => {
+      link.blur()
+      document.body.focus()
+    })
+    await vi.advanceTimersByTimeAsync(299)
+    expect(screen.getByRole('button', { name: 'Pin sidebar' })).toBeInTheDocument()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(screen.queryByRole('button', { name: 'Pin sidebar' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the focused item focused when Escape collapses the unpinned sidebar', async () => {
+    localStorage.setItem('ferricade.sidebar.pinned', 'false')
+    renderAt('/devices')
+    await heading('Devices')
+    const link = screen.getByRole('link', { name: /^Devices/ })
+    act(() => link.focus())
+    expect(screen.getByRole('button', { name: 'Pin sidebar' })).toBeInTheDocument()
+    fireEvent.keyDown(screen.getByRole('link', { name: /^Devices/ }), { key: 'Escape' })
+    expect(screen.queryByRole('button', { name: 'Pin sidebar' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^Devices/ })).toHaveFocus()
+  })
+
+  it('defaults to pinned and remains usable when localStorage throws', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('storage unavailable')
+    })
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage unavailable')
+    })
+    renderAt('/devices')
+    await heading('Devices')
+    const unpin = screen.getByRole('button', { name: 'Unpin sidebar' })
+    expect(unpin).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(unpin)
+    expect(screen.getByRole('button', { name: 'Pin sidebar' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
   })
 })
 

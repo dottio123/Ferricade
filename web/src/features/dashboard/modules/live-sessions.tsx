@@ -67,7 +67,7 @@ export function LiveSessionsModule({
         count > 0 ? (
           <Badge
             variant="outline"
-            className="text-xs font-mono bg-primary/10 text-primary border-primary/30"
+            className="text-xs font-mono bg-primary/10 text-primary-text border-primary/30"
           >
             {count}
           </Badge>
@@ -78,7 +78,7 @@ export function LiveSessionsModule({
           <Link
             to="/sessions"
             aria-label="View all sessions"
-            className="text-xs font-medium text-primary hover:underline"
+            className="text-xs font-medium text-primary-text hover:underline"
           >
             View all
           </Link>
@@ -142,7 +142,7 @@ export function LiveSessionsModule({
 
                   <div className="flex items-center gap-1.5 shrink-0">
                     <DisconnectSession session={session} compact />
-                    <div className="flex items-center gap-1 text-xs font-mono tabular-nums text-primary font-medium bg-primary/10 px-2 py-1 rounded-md">
+                    <div className="flex items-center gap-1 text-xs font-mono tabular-nums text-primary-text font-medium bg-primary/10 px-2 py-1 rounded-md">
                       <TimerIcon className="size-3" />
                       <span>{elapsed}</span>
                     </div>

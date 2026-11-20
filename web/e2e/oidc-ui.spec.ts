@@ -7,7 +7,7 @@ test.use({
 test('OIDC link uses the safe next path and disappears when off', async ({ page }) => {
   await page.goto('/sign-in?mock-session=signed-out&mock-oidc=on&next=%2Fdevices')
   await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
-  await expect(page.getByText('Ferricade', { exact: true })).toBeVisible()
+  await expect(page.getByRole('img', { name: 'Ferricade' })).toBeVisible()
   await expect(page.getByRole('link', { name: 'Sign in with Authentik' })).toHaveAttribute(
     'href',
     '/admin/api/v1/auth/oidc/start?next=%2Fdevices',

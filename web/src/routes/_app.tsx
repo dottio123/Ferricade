@@ -12,8 +12,6 @@ import {
 import { useToast } from '../components/ui/toast'
 import {
   ActivityIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   ChevronsUpDownIcon,
   FolderTreeIcon,
   InfoIcon,
@@ -21,6 +19,7 @@ import {
   LogOutIcon,
   MenuIcon,
   MonitorIcon,
+  PinIcon,
   PaletteIcon,
   ScrollTextIcon,
   SearchIcon,
@@ -68,6 +67,10 @@ import { useThemeSwitch } from '../features/appearance/use-theme-switch'
 import { useRawPreferences } from '../features/dashboard/use-preferences'
 import { UserAvatar } from '../components/user-avatar'
 import { AboutDialog } from '../components/about/about-dialog'
+import { FMark } from '../components/brand/f-mark'
+import { Wordmark } from '../components/brand/wordmark'
+import { clearIntroFlag, readIntroFlag } from '../auth/intro-flag'
+import { FerricadeIntro } from '../components/motion/ferricade-intro'
 
 // ?device=<id> on any signed-in page opens the device panel over it
 // (DevicePanel below; DeviceLink sets it). Every page inherits it;
@@ -129,6 +132,7 @@ function ProfileMenu({
       type="button"
       variant="ghost"
       aria-label={`Profile: ${displayName}`}
+      data-sidebar-focus="profile"
       className={cn(
         'flex items-center gap-2 rounded-md transition-colors hover:bg-muted text-foreground focus-visible:ring-2 focus-visible:ring-ring select-none',
         collapsed
@@ -245,10 +249,43 @@ function AppShell() {
     setDurationSeconds(rawPrefs?.toast_seconds ?? 5)
   }, [rawPrefs?.toast_seconds, setDurationSeconds])
 
-  const [collapsed, setCollapsed] = React.useState(false)
+  const [pinned, setPinned] = React.useState(() => {
+    try {
+      return window.localStorage.getItem('ferricade.sidebar.pinned') !== 'false'
+    } catch {
+      return true
+    }
+  })
+  const [autoExpanded, setAutoExpanded] = React.useState(false)
+  const [openSidebarTooltip, setOpenSidebarTooltip] = React.useState<string | null>(null)
+  const collapsed = !pinned && !autoExpanded
+  const sidebarRef = React.useRef<HTMLElement>(null)
+  const sidebarTimer = React.useRef<number | undefined>(undefined)
+
+  const clearSidebarTimer = () => {
+    window.clearTimeout(sidebarTimer.current)
+  }
+  const expandSidebar = () => {
+    clearSidebarTimer()
+    if (!pinned) {
+      setAutoExpanded(true)
+    }
+  }
+  const scheduleSidebarCollapse = () => {
+    clearSidebarTimer()
+    sidebarTimer.current = window.setTimeout(() => {
+      if (!sidebarRef.current?.contains(document.activeElement)) setAutoExpanded(false)
+    }, 300)
+  }
+  React.useEffect(() => () => clearSidebarTimer(), [])
   const [mobileNavOpen, setMobileNavOpen] = React.useState(false)
   const [paletteOpen, setPaletteOpen] = React.useState(false)
   const [aboutOpen, setAboutOpen] = React.useState(false)
+  const [showIntro, setShowIntro] = React.useState(() => readIntroFlag())
+
+  React.useEffect(() => {
+    if (showIntro) clearIntroFlag()
+  }, [showIntro])
 
   const { theme: currentTheme, setTheme } = useThemeSwitch()
 
@@ -388,32 +425,95 @@ function AppShell() {
       {/* Sidebar (desktop only, hidden in kiosk mode) */}
       {!isKioskMode && (
         <aside
+          ref={sidebarRef}
+          onPointerEnter={() => {
+            clearSidebarTimer()
+            if (!pinned) sidebarTimer.current = window.setTimeout(() => setAutoExpanded(true), 150)
+          }}
+          onPointerLeave={() => {
+            if (!pinned) scheduleSidebarCollapse()
+          }}
+          onFocusCapture={expandSidebar}
+          onBlurCapture={(event) => {
+            if (!pinned && !event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              scheduleSidebarCollapse()
+            }
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Escape' || pinned || !autoExpanded) return
+            event.preventDefault()
+            const target = event.target as HTMLElement
+            const focusKey = target.dataset.sidebarFocus
+            clearSidebarTimer()
+            setAutoExpanded(false)
+            if (focusKey)
+              requestAnimationFrame(() =>
+                (
+                  sidebarRef.current?.querySelector<HTMLElement>(
+                    `[data-sidebar-focus="${focusKey}"]`,
+                  ) ?? sidebarRef.current?.querySelector<HTMLElement>('nav a')
+                )?.focus(),
+              )
+          }}
           className={cn(
-            'hidden md:flex flex-col border-r border-border bg-chrome text-chrome-foreground transition-[width] duration-200 shrink-0 select-none justify-between sticky top-0 h-dvh self-start',
-            collapsed ? 'w-16' : 'w-60',
+            'relative hidden md:flex flex-col border-r border-border bg-chrome text-chrome-foreground shrink-0 select-none justify-between sticky top-0 h-dvh self-start motion-safe:transition-[width] duration-200',
+            pinned ? 'w-60' : 'w-16',
+            autoExpanded && !pinned && 'z-40',
           )}
         >
-          <div className="flex flex-col flex-1 min-h-0">
-            <div className="flex h-[var(--app-header-h,3.5rem)] items-center justify-between border-b border-border px-3">
-              {!collapsed && (
-                <span className="font-mono text-sm font-bold tracking-tight text-primary pl-1">
-                  Ferricade
-                </span>
+          <div
+            className={cn(
+              'flex flex-col flex-1 min-h-0',
+              autoExpanded &&
+                !pinned &&
+                'absolute inset-y-0 left-0 z-40 w-60 bg-chrome shadow-xl motion-safe:transition-[width] duration-200',
+            )}
+          >
+            <div
+              data-slot="sidebar-header"
+              className={cn(
+                'flex h-[var(--app-header-h,3.5rem)] items-center border-b border-border px-3',
+                collapsed ? 'justify-center' : 'justify-between',
               )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setCollapsed((c) => !c)}
-                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                className={cn('h-8 w-8 p-0 text-muted-foreground', collapsed && 'mx-auto')}
-              >
-                {collapsed ? (
-                  <ChevronRightIcon className="size-4" />
-                ) : (
-                  <ChevronLeftIcon className="size-4" />
-                )}
-              </Button>
+            >
+              {collapsed ? (
+                <FMark variant="flat" className="h-6 w-auto" />
+              ) : (
+                <Wordmark variant="flat" className="h-6 w-auto pl-1" />
+              )}
+              {!collapsed && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const nextPinned = !pinned
+                        setPinned(nextPinned)
+                        if (!nextPinned) setAutoExpanded(true)
+                        try {
+                          window.localStorage.setItem(
+                            'ferricade.sidebar.pinned',
+                            String(nextPinned),
+                          )
+                        } catch {
+                          // Storage is optional; the in-memory setting still works.
+                        }
+                      }}
+                      aria-pressed={pinned}
+                      aria-label={pinned ? 'Unpin sidebar' : 'Pin sidebar'}
+                      data-sidebar-focus="pin"
+                      className="h-8 w-8 p-0 text-muted-foreground"
+                    >
+                      <PinIcon className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {pinned ? 'Unpin sidebar' : 'Pin sidebar'}
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
 
             <nav aria-label="Main" className="flex-1 p-2 short:p-1.5 overflow-y-auto">
@@ -423,6 +523,7 @@ function AppShell() {
                   const content = (
                     <Link
                       to={item.to}
+                      data-sidebar-focus={item.to}
                       aria-label={
                         collapsed
                           ? item.badge
@@ -440,6 +541,12 @@ function AppShell() {
                         'flex items-center gap-3 rounded-md px-3 py-2 short:py-1 text-xs transition-colors',
                         collapsed && 'justify-center px-0',
                       )}
+                      onClick={() => {
+                        if (!pinned) {
+                          clearSidebarTimer()
+                          setAutoExpanded(false)
+                        }
+                      }}
                     >
                       <Icon className="size-4 shrink-0" />
                       {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
@@ -453,19 +560,18 @@ function AppShell() {
 
                   return (
                     <li key={item.to}>
-                      {collapsed ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>{content}</TooltipTrigger>
-                          <TooltipContent side="right">
-                            <span>{item.label}</span>
-                            {item.badge && (
-                              <span className="ml-1 text-status-pending">({item.badge})</span>
-                            )}
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        content
-                      )}
+                      <Tooltip
+                        open={collapsed && openSidebarTooltip === item.to}
+                        onOpenChange={(open) => setOpenSidebarTooltip(open ? item.to : null)}
+                      >
+                        <TooltipTrigger asChild>{content}</TooltipTrigger>
+                        <TooltipContent side="right">
+                          <span>{item.label}</span>
+                          {item.badge && (
+                            <span className="ml-1 text-status-pending">({item.badge})</span>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
                     </li>
                   )
                 })}
@@ -481,6 +587,7 @@ function AppShell() {
                   <button
                     type="button"
                     aria-label="About"
+                    data-sidebar-focus="about"
                     onClick={() => setAboutOpen(true)}
                     className="flex items-center justify-center rounded-md p-2 short:p-1.5 text-xs transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
@@ -492,6 +599,7 @@ function AppShell() {
             ) : (
               <button
                 type="button"
+                data-sidebar-focus="about"
                 onClick={() => setAboutOpen(true)}
                 className="flex items-center gap-3 rounded-md px-3 py-2 short:py-1 text-left text-xs transition-colors text-muted-foreground hover:bg-muted hover:text-foreground"
               >
@@ -507,6 +615,7 @@ function AppShell() {
                       <Link
                         to="/settings"
                         aria-label="System Settings"
+                        data-sidebar-focus="settings"
                         activeProps={{
                           className: 'bg-nav-active text-nav-active-foreground font-medium',
                         }}
@@ -523,6 +632,7 @@ function AppShell() {
                 ) : (
                   <Link
                     to="/settings"
+                    data-sidebar-focus="settings"
                     activeProps={{
                       className: 'bg-nav-active text-nav-active-foreground font-medium',
                     }}
@@ -621,8 +731,8 @@ function AppShell() {
             >
               <div className="flex flex-col flex-1 min-h-0">
                 <SheetHeader className="h-14 flex flex-row items-center justify-between border-b border-border px-4 py-0 space-y-0">
-                  <SheetTitle className="font-mono text-sm font-bold tracking-tight text-primary">
-                    Ferricade
+                  <SheetTitle className="flex items-center">
+                    <Wordmark variant="flat" className="h-6 w-auto" />
                   </SheetTitle>
                 </SheetHeader>
 
@@ -725,6 +835,7 @@ function AppShell() {
         <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
         <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
       </div>
+      {showIntro && <FerricadeIntro onComplete={() => setShowIntro(false)} />}
     </div>
   )
 }

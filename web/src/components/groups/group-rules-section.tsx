@@ -241,7 +241,7 @@ export function GroupRulesSection({ group, rules }: GroupRulesSectionProps) {
                     <button
                       type="button"
                       onClick={() => setShowMatches((prev) => !prev)}
-                      className="text-primary hover:underline cursor-pointer inline-flex items-center gap-0.5"
+                      className="text-primary-text hover:underline cursor-pointer inline-flex items-center gap-0.5"
                     >
                       <span>{showMatches ? 'Hide matches' : 'Show matches'}</span>
                       {showMatches ? (

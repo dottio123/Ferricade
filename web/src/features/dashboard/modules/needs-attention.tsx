@@ -111,7 +111,7 @@ export function NeedsAttentionModule({
           <Link
             to="/devices"
             aria-label="View all devices"
-            className="text-xs font-medium text-primary hover:underline"
+            className="text-xs font-medium text-primary-text hover:underline"
           >
             View all
           </Link>
@@ -145,7 +145,7 @@ export function NeedsAttentionModule({
                 <>
                   <div className="flex flex-col min-w-0 pr-3">
                     <div data-slot="wall-row-primary" className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate min-w-0 flex-1">
+                      <span className="text-sm font-medium text-foreground group-hover:text-primary-text transition-colors truncate min-w-0 flex-1">
                         {item.name}
                       </span>
                       <MonoId idText={item.rustdesk_id} />

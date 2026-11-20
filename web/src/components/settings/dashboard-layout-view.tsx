@@ -78,7 +78,7 @@ export function DashboardLayoutView() {
                       {isActive && (
                         <Badge
                           variant="outline"
-                          className="text-2xs gap-1 text-primary border-primary/30"
+                          className="text-2xs gap-1 text-primary-text border-primary/30"
                         >
                           <CheckIcon className="size-3" />
                           Active

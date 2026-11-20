@@ -39,7 +39,7 @@ export function SessionsStatsCard({
     <Card data-slot="sessions-stats-card" className="border-border bg-card">
       <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3">
         <div className="flex items-center gap-2">
-          <BarChart3Icon className="size-4 text-primary" />
+          <BarChart3Icon className="size-4 text-primary-text" />
           <CardTitle className="text-sm font-semibold text-foreground">
             Session activity & stats
           </CardTitle>
@@ -146,7 +146,7 @@ export function SessionsStatsCard({
                       <button
                         type="button"
                         onClick={() => onSelectDevice?.(d.device_id)}
-                        className="truncate max-w-[140px] font-medium text-foreground text-left hover:text-primary hover:underline cursor-pointer"
+                        className="truncate max-w-[140px] font-medium text-foreground text-left hover:text-primary-text hover:underline cursor-pointer"
                         title={d.device_name}
                       >
                         {d.device_name}

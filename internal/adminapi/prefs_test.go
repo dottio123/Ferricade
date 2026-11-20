@@ -61,6 +61,10 @@ func allModules(enabled map[string]bool, order []string) []map[string]any {
 	return out
 }
 
+func TestDefaultPrefsUsesFerricadePalette(t *testing.T) {
+	require.Equal(t, "ferricade", defaultPrefs().Palette)
+}
+
 func TestCatalog(t *testing.T) {
 	e := newEnv(t)
 	e.markSetupComplete()
@@ -142,7 +146,7 @@ func TestPreferencesDefault(t *testing.T) {
 
 	require.Equal(t, "business", body["preset"])
 	require.Equal(t, "system", body["theme"])
-	require.Equal(t, "default", body["palette"])
+	require.Equal(t, "ferricade", body["palette"])
 	require.Equal(t, "comfortable", body["density"])
 	require.Equal(t, []any{}, body["pinned_device_ids"])
 	require.Equal(t, float64(5), body["toast_seconds"])
@@ -260,7 +264,7 @@ func TestPreferencesPaletteKeptWhenOmitted(t *testing.T) {
 	kept := c.ok(http.MethodPut, apiPrefix+"/me/preferences", base)
 	require.Equal(t, "moss", kept["palette"])
 	fresh, _ := e.signedIn("bob", "admin")
-	require.Equal(t, "default", fresh.ok(http.MethodPut, apiPrefix+"/me/preferences", base)["palette"])
+	require.Equal(t, "ferricade", fresh.ok(http.MethodPut, apiPrefix+"/me/preferences", base)["palette"])
 }
 
 func TestPreferencesRoundTrip(t *testing.T) {
@@ -371,7 +375,7 @@ func TestPreferencesValidation(t *testing.T) {
 		res := c.do(http.MethodPut, apiPrefix+"/me/preferences", mut(func(m map[string]any) { m["palette"] = palette }))
 		require.Equal(t, http.StatusBadRequest, res.Code)
 		require.Contains(t, res.Body.String(), `"code":"bad_request"`)
-		require.Contains(t, res.Body.String(), "palette must be default, graphite, ocean, violet, moss or sandstone")
+		require.Contains(t, res.Body.String(), "palette must be ferricade, indigo, graphite, ocean, violet, moss or sandstone")
 	}
 
 	// Size is the only thing wrong with the oversize body: it is valid JSON
@@ -426,12 +430,12 @@ func TestPreferencesForwardCompatible(t *testing.T) {
 	require.Equal(t, "medium", sizes["fleet-pulse"])
 	require.Equal(t, "light", got["theme"])
 	require.Equal(t, "compact", got["density"])
-	require.Equal(t, "default", got["palette"])
+	require.Equal(t, "ferricade", got["palette"])
 	require.Equal(t, float64(5), got["toast_seconds"], "stored blobs without a toast duration use the default")
 	_, err = e.d.Pool.Exec(context.Background(), `UPDATE user_preferences SET prefs = jsonb_set(prefs, '{palette}', '"neon"') WHERE user_id = $1`, id)
 	require.NoError(t, err)
 	got = c.ok(http.MethodGet, apiPrefix+"/me/preferences", nil)
-	require.Equal(t, "default", got["palette"])
+	require.Equal(t, "ferricade", got["palette"])
 	_, err = e.d.Pool.Exec(context.Background(), `UPDATE user_preferences SET prefs = jsonb_set(prefs, '{toast_seconds}', '7') WHERE user_id = $1`, id)
 	require.NoError(t, err)
 	got = c.ok(http.MethodGet, apiPrefix+"/me/preferences", nil)

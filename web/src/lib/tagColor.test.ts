@@ -68,4 +68,45 @@ describe('tagColor helper', () => {
     // 0xFF2196F3 (Material Blue) -> luminance is ~0.29, best with black text (or tested cutoff)
     expect(textColorFor(4280391411)).toBe('black')
   })
+
+  it('chooses the higher WCAG contrast ratio near the black/white crossover', () => {
+    expect(textColorFor(0xff777777)).toBe('black')
+    expect(textColorFor(0xff767676)).toBe('black')
+    expect(textColorFor(0xff757575)).toBe('white')
+  })
+
+  it('composites translucent tags over the supplied page background', () => {
+    expect(textColorFor(0x80ff0000, 0xffffffff)).toBe('black')
+    expect(textColorFor(0x80ff0000, 0xff000000)).toBe('white')
+  })
+
+  it('always selects the better contrast for opaque and translucent colors', () => {
+    const luminance = (channel: number) => {
+      const value = channel / 255
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+    }
+    const ratio = (argb: number, text: 'black' | 'white', background: number) => {
+      const color = argb >>> 0
+      const ground = background >>> 0
+      const alpha = ((color >>> 24) & 0xff) / 255
+      const channels = [16, 8, 0].map(
+        (shift) =>
+          (((color >>> shift) & 0xff) * alpha + ((ground >>> shift) & 0xff) * (1 - alpha)) / 255,
+      )
+      const lum =
+        0.2126 * luminance(channels[0]! * 255) +
+        0.7152 * luminance(channels[1]! * 255) +
+        0.0722 * luminance(channels[2]! * 255)
+      return text === 'black' ? (lum + 0.05) / 0.05 : 1.05 / (lum + 0.05)
+    }
+
+    for (const color of [0xff777777, 0xff009688, 0x802196f3, 0x40ff5722]) {
+      for (const ground of [0xffffffff, 0xff0b0f19]) {
+        const selected = textColorFor(color, ground)
+        expect(ratio(color, selected, ground)).toBeGreaterThanOrEqual(
+          ratio(color, selected === 'black' ? 'white' : 'black', ground),
+        )
+      }
+    }
+  })
 })

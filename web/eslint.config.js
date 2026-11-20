@@ -38,10 +38,11 @@ const restrictProperties = (names) => [
     names.map((property) => ({ object, property, message: NETWORK_MESSAGE })),
   ),
 ]
-// The appearance cache (theme and density for the first paint) is the one
-// thing kept in localStorage: src/lib/appearance.ts writes it, public/theme.js
-// reads it before the app loads.
+// Appearance and the sidebar's non-sensitive pin setting are browser UI state;
+// public/theme.js also reads the appearance cache before the app loads.
 const EXCEPT_LOCAL_STORAGE = NETWORK_AND_STORAGE.filter((name) => name !== 'localStorage')
+// Post-sign-in intro plays once per sign-in in the same tab via a non-sensitive sessionStorage flag.
+const EXCEPT_SESSION_STORAGE = NETWORK_AND_STORAGE.filter((name) => name !== 'sessionStorage')
 // A service worker forwards navigations with fetch but must not store or cache
 // anything: fetch is allowed in public/sw.js, and the Cache API is banned there too.
 const SERVICE_WORKER = [...NETWORK_AND_STORAGE.filter((name) => name !== 'fetch'), 'caches']
@@ -119,10 +120,17 @@ export default tseslint.config(
     },
   },
   {
-    files: ['src/lib/appearance.ts', 'public/**/*.js'],
+    files: ['src/lib/appearance.ts', 'src/routes/_app.tsx', 'public/**/*.js'],
     rules: {
       'no-restricted-globals': restrictGlobals(EXCEPT_LOCAL_STORAGE),
       'no-restricted-properties': restrictProperties(EXCEPT_LOCAL_STORAGE),
+    },
+  },
+  {
+    files: ['src/auth/intro-flag.ts'],
+    rules: {
+      'no-restricted-globals': restrictGlobals(EXCEPT_SESSION_STORAGE),
+      'no-restricted-properties': restrictProperties(EXCEPT_SESSION_STORAGE),
     },
   },
   // public/: plain scripts the browser runs as they are (not bundled).

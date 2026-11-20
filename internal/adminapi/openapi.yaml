@@ -727,9 +727,9 @@ components:
         theme: {type: string, enum: [dark, light, system], description: The colour mode.}
         palette:
           type: string
-          enum: [default, graphite, ocean, violet, moss, sandstone]
+          enum: [ferricade, indigo, graphite, ocean, violet, moss, sandstone]
           description: >-
-            The colour theme; each has a light and a dark variant, chosen by theme.
+            The colour theme; ferricade is the default, and each palette has light and dark variants.
             Responses always carry it; a PUT may leave it out to keep the stored palette.
         density: {type: string, enum: [comfortable, compact]}
         toast_seconds:

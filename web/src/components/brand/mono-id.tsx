@@ -55,13 +55,13 @@ export function MonoId({
             aria-label={`Copy ${idText}`}
             onClick={handleCopy}
             className={cn(
-              'group inline-flex items-center gap-1.5 rounded-sm bg-muted/70 px-1.5 py-0.5 font-mono text-xs text-foreground transition-colors hover:bg-muted hover:text-primary focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring cursor-pointer',
+              'group inline-flex items-center gap-1.5 rounded-sm bg-muted/70 px-1.5 py-0.5 font-mono text-xs text-foreground transition-colors hover:bg-muted hover:text-primary-text focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-ring cursor-pointer',
               className,
             )}
             {...(props as React.ButtonHTMLAttributes<HTMLButtonElement>)}
           >
             <span>{displayText}</span>
-            <span className="text-muted-foreground transition-colors group-hover:text-primary">
+            <span className="text-muted-foreground transition-colors group-hover:text-primary-text">
               {copyState === 'copied' ? (
                 <CheckIcon className="size-3 text-status-online" />
               ) : (

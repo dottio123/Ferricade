@@ -142,11 +142,14 @@ func TestDeviceEndpoints(t *testing.T) {
 	d = c.ok(http.MethodPatch, apiPrefix+"/devices/"+idA.String(), map[string]any{"group_id": nil})
 	require.Nil(t, d["group_id"])
 	require.Equal(t, "Reception", d["alias"], "absent fields are kept")
+	d = c.ok(http.MethodPatch, apiPrefix+"/devices/"+idA.String(), map[string]any{"alias": "", "note": ""})
+	require.Equal(t, "", d["alias"])
+	require.Equal(t, "", d["note"])
 	requireError(t, c.do(http.MethodPatch, apiPrefix+"/devices/"+idA.String(), map[string]any{"tag_ids": []string{uuid.NewString()}}),
 		http.StatusBadRequest, "bad_request")
 	requireError(t, c.do(http.MethodPatch, apiPrefix+"/devices/"+idA.String(), map[string]any{"bogus": 1}),
 		http.StatusBadRequest, "bad_request")
-	require.Len(t, e.auditEntries("device.updated"), 2)
+	require.Len(t, e.auditEntries("device.updated"), 3)
 
 	list = items(t, c.ok(http.MethodGet, apiPrefix+"/devices?tag="+tag["id"].(string), nil))
 	require.Len(t, list, 1)

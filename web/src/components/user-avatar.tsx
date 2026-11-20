@@ -31,7 +31,7 @@ export function UserAvatar({ name, src, size = 'md', className }: UserAvatarProp
   return (
     <div
       className={cn(
-        'rounded-full flex items-center justify-center bg-primary/10 text-primary border border-primary/20 shrink-0 select-none overflow-hidden font-medium',
+        'rounded-full flex items-center justify-center bg-primary/10 text-primary-text border border-primary/20 shrink-0 select-none overflow-hidden font-medium',
         sizeClasses[size],
         className,
       )}

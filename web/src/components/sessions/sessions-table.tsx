@@ -37,7 +37,7 @@ function SessionTypeBadge({ type }: { type: RemoteSession['type'] }) {
     case 'remote':
       return (
         <Badge variant="outline" className="gap-1 font-normal text-xs">
-          <MonitorIcon className="size-3 text-primary" />
+          <MonitorIcon className="size-3 text-primary-text" />
           Remote
         </Badge>
       )
@@ -177,7 +177,7 @@ const SessionRowItem = React.memo(function SessionRowItem({ session }: { session
         <div className="flex flex-col min-w-0">
           <DeviceLink
             deviceId={session.device_id}
-            className="text-xs font-semibold text-foreground hover:text-primary hover:underline truncate max-w-[200px]"
+            className="text-xs font-semibold text-foreground hover:text-primary-text hover:underline truncate max-w-[200px]"
             title={session.device_name}
           >
             {session.device_name || 'Unnamed device'}
@@ -237,7 +237,7 @@ const SessionRowItem = React.memo(function SessionRowItem({ session }: { session
           <span className="text-muted-foreground sm:hidden">Duration:</span>
           <span
             className={`font-mono tabular-nums ${
-              isOpen ? 'text-primary font-medium' : 'text-foreground'
+              isOpen ? 'text-primary-text font-medium' : 'text-foreground'
             }`}
           >
             {isOpen ? <LiveDuration startedAt={session.started_at} /> : durationText}

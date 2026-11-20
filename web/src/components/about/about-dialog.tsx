@@ -7,10 +7,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Wordmark } from '@/components/brand/wordmark'
 import { currentVersion, parseChangelog } from './changelog'
 
 const releases = parseChangelog(changelogText)
 const version = currentVersion(releases)
+const CHANGELOG_RELEASES_SHOWN = 5
 
 function renderItem(item: string) {
   return item.split(/(`[^`]+`)/g).map((part, index) =>
@@ -34,7 +36,8 @@ export function AboutDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+        <DialogHeader className="gap-3">
+          <Wordmark variant="rust" decorative className="h-8 w-auto max-w-full self-start" />
           <DialogTitle>About Ferricade</DialogTitle>
           <DialogDescription className="sr-only">
             About Ferricade and its release history
@@ -61,7 +64,7 @@ export function AboutDialog({
             <p>Ferricade is not affiliated with or endorsed by RustDesk.</p>
           </TabsContent>
           <TabsContent value="changelog" className="max-h-[60vh] overflow-y-auto space-y-4 pr-1">
-            {releases.map((release, index) => (
+            {releases.slice(0, CHANGELOG_RELEASES_SHOWN).map((release, index) => (
               <details
                 key={`${release.version}-${release.date ?? 'unreleased'}`}
                 data-slot="changelog-release"
@@ -90,6 +93,14 @@ export function AboutDialog({
                 </div>
               </details>
             ))}
+            <a
+              href="https://github.com/dottio123/ferricade/blob/main/CHANGELOG.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary-text hover:underline font-medium inline-flex items-center gap-1"
+            >
+              Full changelog on GitHub
+            </a>
           </TabsContent>
         </Tabs>
       </DialogContent>

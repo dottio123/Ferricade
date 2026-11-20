@@ -360,7 +360,7 @@ function LogExportForm({ initialData, isOwner }: LogExportFormProps) {
                   href="https://github.com/dottio123/ferricade#log-export"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:underline font-medium inline-flex items-center gap-1"
+                  className="text-primary-text hover:underline font-medium inline-flex items-center gap-1"
                 >
                   How to set it up
                   <ExternalLinkIcon className="size-3" />

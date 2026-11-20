@@ -67,15 +67,14 @@ for (const c of cases) {
         expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(c.touch)
 
         if (collapsed) {
-          await page.getByRole('button', { name: 'Collapse sidebar' }).click()
+          await page.getByRole('button', { name: 'Unpin sidebar' }).click()
+          await page.mouse.move(500, 500)
+          await page.evaluate(() => (document.activeElement as HTMLElement).blur())
+          await expect(page.getByRole('button', { name: 'Pin sidebar' })).toBeHidden()
         }
-        await expect(
-          page.getByRole('button', { name: collapsed ? 'Expand sidebar' : 'Collapse sidebar' }),
-        ).toBeVisible()
+        await expect(page.locator('aside [data-slot="sidebar-header"]')).toBeVisible()
 
-        const brandRow = page
-          .getByRole('button', { name: collapsed ? 'Expand sidebar' : 'Collapse sidebar' })
-          .locator('xpath=..')
+        const brandRow = page.locator('aside [data-slot="sidebar-header"]')
         const bottoms = async () => {
           const [row, header] = await Promise.all([
             brandRow.boundingBox(),

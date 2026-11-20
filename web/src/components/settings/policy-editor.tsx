@@ -263,7 +263,7 @@ export function PolicyEditor({ policy, catalog, onClose, onSaved }: PolicyEditor
                       )}
                       <Badge
                         variant="outline"
-                        className="text-2xs py-0 px-1 font-normal text-primary"
+                        className="text-2xs py-0 px-1 font-normal text-primary-text"
                       >
                         Required
                       </Badge>

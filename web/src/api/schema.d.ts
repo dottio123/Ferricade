@@ -5159,10 +5159,10 @@ export interface components {
              */
             theme: "dark" | "light" | "system";
             /**
-             * @description The colour theme; each has a light and a dark variant, chosen by theme. Responses always carry it; a PUT may leave it out to keep the stored palette.
+             * @description The colour theme; ferricade is the default, and each palette has light and dark variants. Responses always carry it; a PUT may leave it out to keep the stored palette.
              * @enum {string}
              */
-            palette: "default" | "graphite" | "ocean" | "violet" | "moss" | "sandstone";
+            palette: "ferricade" | "indigo" | "graphite" | "ocean" | "violet" | "moss" | "sandstone";
             /** @enum {string} */
             density: "comfortable" | "compact";
             /**

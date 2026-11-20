@@ -33,7 +33,7 @@ test.describe('Appearance settings', () => {
     await expect(page.locator('html')).toHaveAttribute('data-palette', 'ocean')
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
 
-    await page.getByRole('radio', { name: 'Default' }).locator('xpath=..').click()
+    await page.getByRole('radio', { name: 'Indigo' }).locator('xpath=..').click()
     await expect(page.locator('html')).not.toHaveAttribute('data-palette')
   })
 
@@ -41,8 +41,8 @@ test.describe('Appearance settings', () => {
     await page.goto('/account/appearance?mock-fail=putPreferences')
     await page.getByRole('radio', { name: 'Graphite' }).locator('xpath=..').click()
     await expect(page.getByRole('alert')).toBeVisible()
-    await expect(page.getByRole('radio', { name: 'Default' })).toBeChecked()
-    await expect(page.locator('html')).not.toHaveAttribute('data-palette')
+    await expect(page.getByRole('radio', { name: 'Ferricade' })).toBeChecked()
+    await expect(page.locator('html')).toHaveAttribute('data-palette', 'ferricade')
   })
 
   test('applies theme and mode cascading tokens correctly across all palettes and modes', async ({
@@ -55,7 +55,7 @@ test.describe('Appearance settings', () => {
     function getExpectedPrimary(palette: string, mode: 'light' | 'dark'): string {
       const esc = palette.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const selector =
-        palette === 'default'
+        palette === 'indigo'
           ? mode === 'light'
             ? '^:root\\s*,\\s*\\[data-theme=["\']light["\']\\]'
             : '^\\[data-theme=["\']dark["\']\\]'
@@ -74,7 +74,8 @@ test.describe('Appearance settings', () => {
     }
 
     const palettes = [
-      { name: 'Default', key: 'default' },
+      { name: 'Ferricade', key: 'ferricade' },
+      { name: 'Indigo', key: 'indigo' },
       { name: 'Graphite', key: 'graphite' },
       { name: 'Ocean', key: 'ocean' },
       { name: 'Violet', key: 'violet' },
@@ -86,7 +87,7 @@ test.describe('Appearance settings', () => {
 
     for (const { name, key } of palettes) {
       await page.getByRole('radio', { name }).locator('xpath=..').click()
-      if (key === 'default') {
+      if (key === 'indigo') {
         await expect(page.locator('html')).not.toHaveAttribute('data-palette')
       } else {
         await expect(page.locator('html')).toHaveAttribute('data-palette', key)
@@ -145,7 +146,8 @@ test.describe('Appearance settings', () => {
     await page.goto('/account/appearance')
 
     const cardLabels = [
-      page.getByRole('radio', { name: 'Default' }).locator('xpath=..'),
+      page.getByRole('radio', { name: 'Ferricade' }).locator('xpath=..'),
+      page.getByRole('radio', { name: 'Indigo' }).locator('xpath=..'),
       page.getByRole('radio', { name: 'Graphite' }).locator('xpath=..'),
       page.getByRole('radio', { name: 'Ocean' }).locator('xpath=..'),
       page.getByRole('radio', { name: 'Violet' }).locator('xpath=..'),
@@ -204,7 +206,7 @@ test.describe('Appearance settings', () => {
     function getExpectedToken(palette: string, mode: 'light' | 'dark', tokenName: string): string {
       const esc = palette.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
       const selector =
-        palette === 'default'
+        palette === 'indigo'
           ? mode === 'light'
             ? '^:root\\s*,\\s*\\[data-theme=["\']light["\']\\]'
             : '^\\[data-theme=["\']dark["\']\\]'
@@ -223,7 +225,8 @@ test.describe('Appearance settings', () => {
     }
 
     const palettes = [
-      { name: 'Default', key: 'default' },
+      { name: 'Ferricade', key: 'ferricade' },
+      { name: 'Indigo', key: 'indigo' },
       { name: 'Graphite', key: 'graphite' },
       { name: 'Ocean', key: 'ocean' },
       { name: 'Violet', key: 'violet' },
@@ -269,26 +272,39 @@ test.describe('Appearance settings', () => {
     await page.getByRole('radio', { name: 'Ocean' }).locator('xpath=..').click()
     await page.getByRole('radio', { name: 'Dark' }).click()
 
-    const defaultCard = page.getByRole('radio', { name: 'Default' }).locator('xpath=..')
-    const oceanCard = page.getByRole('radio', { name: 'Ocean' }).locator('xpath=..')
+    const ferricadeCard = page.getByRole('radio', { name: 'Ferricade' }).locator('xpath=..')
+    const indigoCard = page.getByRole('radio', { name: 'Indigo' }).locator('xpath=..')
 
-    const defaultDarkPrimary = hexToRgbString(getExpectedToken('default', 'dark', '--primary'))
+    const ferricadeDarkPrimary = hexToRgbString(getExpectedToken('ferricade', 'dark', '--primary'))
     const oceanDarkPrimary = hexToRgbString(getExpectedToken('ocean', 'dark', '--primary'))
+    const ferricadeWordmark = ferricadeCard
+      .locator('[data-brand-logo="wordmark"] [data-brand-part="ink"]')
+      .first()
+    const indigoWordmark = indigoCard
+      .locator('[data-brand-logo="wordmark"] [data-brand-part="ink"]')
+      .first()
 
     await expect
       .poll(async () => {
-        return defaultCard
+        return ferricadeCard
           .locator('[data-slot="preview-primary-btn"]')
           .evaluate((el) => getComputedStyle(el).backgroundColor)
       })
-      .toBe(defaultDarkPrimary)
+      .toBe(ferricadeDarkPrimary)
 
     await expect
       .poll(async () => {
-        return oceanCard
+        return page
+          .getByRole('radio', { name: 'Ocean' })
+          .locator('xpath=..')
           .locator('[data-slot="preview-primary-btn"]')
           .evaluate((el) => getComputedStyle(el).backgroundColor)
       })
       .toBe(oceanDarkPrimary)
+
+    await page.getByRole('radio', { name: 'Ferricade' }).locator('xpath=..').click()
+    await expect
+      .poll(async () => ferricadeWordmark.evaluate((el) => getComputedStyle(el).fill))
+      .not.toBe(await indigoWordmark.evaluate((el) => getComputedStyle(el).fill))
   })
 })

@@ -148,7 +148,7 @@ describe('dashboard preferences', () => {
   it('reconciles empty preferences to default business preset with preset sizes', () => {
     const prefs = reconcilePreferences(MOCK_CATALOG, null)
     expect(prefs.preset).toBe('business')
-    expect(prefs.palette).toBe('default')
+    expect(prefs.palette).toBe('ferricade')
     expect(prefs.modules).toHaveLength(11)
 
     // First 8 should be enabled in business preset order and with preset sizes
@@ -223,7 +223,7 @@ describe('dashboard preferences', () => {
       modules: MOCK_CATALOG.modules.map((m) => ({ id: m.id, enabled: true, size: m.default_size })),
       pinned_device_ids: [],
       theme: 'dark',
-      palette: 'default',
+      palette: 'ferricade',
       density: 'comfortable',
       toast_seconds: 5,
     }

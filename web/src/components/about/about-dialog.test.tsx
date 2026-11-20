@@ -13,16 +13,37 @@ describe('AboutDialog', () => {
       ),
     ).toBeVisible()
     const dialog = screen.getByRole('dialog', { name: 'About Ferricade' })
+    const wordmark = dialog.querySelector('[data-brand-logo="wordmark"]')
+    expect(wordmark).not.toBeNull()
+    expect(wordmark).toHaveAttribute('data-brand-variant', 'rust')
+    expect(wordmark).toHaveAttribute('aria-hidden', 'true')
     fireEvent.mouseDown(within(dialog).getByRole('tab', { name: 'Changelog' }), { button: 0 })
-    await screen.findByText(
-      'An About window, opened from the bottom of the sidebar, shows the version and this changelog.',
-    )
     const releases = Array.from(document.querySelectorAll('[data-slot="changelog-release"]'))
+    expect(releases).toHaveLength(5)
+    fireEvent.mouseDown(within(dialog).getByRole('tab', { name: 'About' }), { button: 0 })
+    const version = screen
+      .getByText(
+        (_, element) => element?.tagName === 'P' && element.textContent?.startsWith('Version '),
+      )
+      .textContent?.match(/\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/)?.[0]
+    expect(releases[0]?.querySelector('summary')?.textContent).toContain(version)
+    fireEvent.mouseDown(within(dialog).getByRole('tab', { name: 'Changelog' }), { button: 0 })
+    expect(screen.getByRole('link', { name: 'Full changelog on GitHub' })).toHaveAttribute(
+      'href',
+      'https://github.com/dottio123/ferricade/blob/main/CHANGELOG.md',
+    )
+    expect(screen.getByRole('link', { name: 'Full changelog on GitHub' })).toHaveAttribute(
+      'target',
+      '_blank',
+    )
+    expect(screen.getByRole('link', { name: 'Full changelog on GitHub' })).toHaveAttribute(
+      'rel',
+      'noopener noreferrer',
+    )
     expect(releases[0]).toHaveAttribute('open')
     expect(releases.slice(1).every((release) => !release.hasAttribute('open'))).toBe(true)
-    const release060 = releases.find((release) => release.textContent?.includes('0.6.0'))
-    release060?.querySelector('summary')?.click()
-    expect(release060?.querySelector('code')?.textContent).toContain('user set-password')
+    releases[0]?.querySelector('summary')?.click()
+    expect(releases[0]?.querySelector('li')?.textContent).toBeTruthy()
     fireEvent.mouseDown(within(dialog).getByRole('tab', { name: 'About' }), { button: 0 })
     fireEvent.mouseDown(within(dialog).getByRole('tab', { name: 'Changelog' }), { button: 0 })
     expect(document.querySelector('[data-slot="changelog-release"]')).toHaveAttribute('open')

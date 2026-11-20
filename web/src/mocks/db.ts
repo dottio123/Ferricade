@@ -1452,11 +1452,17 @@ export class MockDB {
     }
     if (!stored) stored = presetPreferences('business')
 
-    const palette = ['default', 'graphite', 'ocean', 'violet', 'moss', 'sandstone'].includes(
-      (stored as Preferences & { palette?: string }).palette ?? '',
-    )
+    const palette = [
+      'ferricade',
+      'indigo',
+      'graphite',
+      'ocean',
+      'violet',
+      'moss',
+      'sandstone',
+    ].includes((stored as Preferences & { palette?: string }).palette ?? '')
       ? (stored as Preferences).palette
-      : 'default'
+      : 'ferricade'
 
     const toastSeconds = [0, 3, 5, 10, 30].includes(
       (stored as Preferences & { toast_seconds?: number }).toast_seconds ?? -1,

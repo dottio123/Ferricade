@@ -115,7 +115,7 @@ helps someone else. Issues and pull requests are welcome.
 
 ## Compatibility
 
-Ferricade is stable at version 2.0.0 and has been tested with stock RustDesk
+Ferricade is stable at version 2.1.0 and has been tested with stock RustDesk
 1.5.0 clients. The admin console serves the web UI from the same origin as its
 API.
 

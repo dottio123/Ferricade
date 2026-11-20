@@ -1,5 +1,3 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   APPEARANCE_KEY,
@@ -16,7 +14,7 @@ const root = document.documentElement
 
 beforeEach(() => {
   document.head.innerHTML = `
-    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <meta name="theme-color" content="#4338ca" />
   `
 })
@@ -44,7 +42,7 @@ describe('applyAppearance', () => {
 
   it('leaves the theme to prefers-color-scheme for "system"', () => {
     applyAppearance({ theme: 'dark', palette: 'ocean', density: 'comfortable' })
-    applyAppearance({ theme: 'system', palette: 'default', density: 'comfortable' })
+    applyAppearance({ theme: 'system', palette: 'indigo', density: 'comfortable' })
     expect(root.hasAttribute('data-theme')).toBe(false)
     expect(root.dataset.density).toBe('comfortable')
     expect(root.hasAttribute('data-palette')).toBe(false)
@@ -56,7 +54,7 @@ describe('applyAppearance', () => {
       throw new DOMException('blocked', 'SecurityError')
     }
     try {
-      applyAppearance({ theme: 'dark', palette: 'default', density: 'compact' })
+      applyAppearance({ theme: 'dark', palette: 'indigo', density: 'compact' })
     } finally {
       Storage.prototype.setItem = setItem
     }
@@ -70,7 +68,7 @@ describe('readCachedAppearance', () => {
     expect(readCachedAppearance()).toEqual(DEFAULT_APPEARANCE)
     expect(DEFAULT_APPEARANCE).toEqual({
       theme: 'system',
-      palette: 'default',
+      palette: 'ferricade',
       density: 'comfortable',
     })
   })
@@ -97,7 +95,7 @@ describe('readCachedAppearance', () => {
     localStorage.setItem(APPEARANCE_KEY, '{"theme":"light","palette":"neon","density":"cozy"}')
     expect(readCachedAppearance()).toEqual({
       theme: 'light',
-      palette: 'default',
+      palette: 'ferricade',
       density: 'comfortable',
     })
   })
@@ -109,7 +107,7 @@ describe('readCachedAppearance', () => {
     localStorage.setItem(APPEARANCE_KEY, raw)
     expect(readCachedAppearance()).toEqual({
       theme: 'dark',
-      palette: 'default',
+      palette: 'ferricade',
       density: 'compact',
     })
   })
@@ -118,6 +116,15 @@ describe('readCachedAppearance', () => {
     localStorage.setItem(APPEARANCE_KEY, '{"theme":"dark","palette":"moss","density":"compact"}')
     expect(readCachedAppearance()).toEqual({ theme: 'dark', palette: 'moss', density: 'compact' })
   })
+
+  it('maps the old default palette to Ferricade', () => {
+    localStorage.setItem(APPEARANCE_KEY, '{"theme":"dark","palette":"default","density":"compact"}')
+    expect(readCachedAppearance()).toEqual({
+      theme: 'dark',
+      palette: 'ferricade',
+      density: 'compact',
+    })
+  })
 })
 
 // public/theme.js runs before the app (a plain script, no imports), so it
@@ -125,9 +132,21 @@ describe('readCachedAppearance', () => {
 describe('public/theme.js', () => {
   const runThemeScript = () => new Function(script)()
 
+  it('maps the old cached default palette to Ferricade before first paint', () => {
+    localStorage.setItem(
+      APPEARANCE_KEY,
+      '{"theme":"light","palette":"default","density":"comfortable"}',
+    )
+    runThemeScript()
+    expect(root.dataset.palette).toBe('ferricade')
+    expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe(
+      THEME_COLORS.ferricade.light,
+    )
+  })
+
   it.each<Appearance>([
     { theme: 'dark', palette: 'violet', density: 'compact' },
-    { theme: 'light', palette: 'default', density: 'comfortable' },
+    { theme: 'light', palette: 'indigo', density: 'comfortable' },
     { theme: 'system', palette: 'ocean', density: 'compact' },
     { theme: 'dark', palette: 'moss', density: 'comfortable' },
   ])('applies what applyAppearance cached: %o', (appearance) => {
@@ -142,7 +161,7 @@ describe('public/theme.js', () => {
     )
     expect(root.dataset.density).toBe(appearance.density)
     expect(root.dataset.palette).toBe(
-      appearance.palette === 'default' ? undefined : appearance.palette,
+      appearance.palette === 'indigo' ? undefined : appearance.palette,
     )
   })
 
@@ -151,7 +170,7 @@ describe('public/theme.js', () => {
     expect(runThemeScript).not.toThrow()
     expect(root.hasAttribute('data-theme')).toBe(false)
     expect(root.dataset.density).toBe('comfortable')
-    expect(root.hasAttribute('data-palette')).toBe(false)
+    expect(root.dataset.palette).toBe('ferricade')
   })
 
   it('survives storage that throws', () => {
@@ -169,21 +188,20 @@ describe('public/theme.js', () => {
 
   it.each<Appearance>([
     { theme: 'dark', palette: 'violet', density: 'compact' },
-    { theme: 'light', palette: 'default', density: 'comfortable' },
+    { theme: 'light', palette: 'indigo', density: 'comfortable' },
     { theme: 'system', palette: 'ocean', density: 'compact' },
     { theme: 'dark', palette: 'moss', density: 'comfortable' },
     { theme: 'light', palette: 'sandstone', density: 'comfortable' },
     { theme: 'dark', palette: 'graphite', density: 'compact' },
-  ])('theme.js sets icon href and theme-color matching applyAppearance: %o', (appearance) => {
+  ])('theme.js applies cached appearance and theme-color: %o', (appearance) => {
     applyAppearance(appearance)
-    const expectedIcon = document.querySelector('link[rel="icon"]')?.getAttribute('href')
     const expectedColor = document
       .querySelector('meta[name="theme-color"]')
       ?.getAttribute('content')
 
     // Reset DOM head & attributes to defaults before running theme.js
     document.head.innerHTML = `
-      <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+      <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       <meta name="theme-color" content="#4338ca" />
     `
     root.removeAttribute('data-theme')
@@ -192,9 +210,7 @@ describe('public/theme.js', () => {
 
     runThemeScript()
 
-    const actualIcon = document.querySelector('link[rel="icon"]')?.getAttribute('href')
     const actualColor = document.querySelector('meta[name="theme-color"]')?.getAttribute('content')
-    expect(actualIcon).toBe(expectedIcon)
     expect(actualColor).toBe(expectedColor)
   })
 
@@ -213,7 +229,7 @@ describe('public/theme.js', () => {
       )
 
       document.head.innerHTML = `
-        <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <meta name="theme-color" content="#4338ca" />
       `
       root.removeAttribute('data-theme')
@@ -225,9 +241,7 @@ describe('public/theme.js', () => {
       expect(document.querySelector('meta[name="theme-color"]')?.getAttribute('content')).toBe(
         THEME_COLORS.sandstone.dark,
       )
-      expect(document.querySelector('link[rel="icon"]')?.getAttribute('href')).toBe(
-        '/icons/icon-sandstone.svg',
-      )
+      expect(document.querySelector('link[rel="icon"]')?.getAttribute('href')).toBe('/favicon.svg')
     } finally {
       window.matchMedia = origMatchMedia
     }
@@ -238,8 +252,7 @@ describe('applyAppearance: icon and theme-color', () => {
   it.each(PALETTES)('sets the expected icon href for palette "%s"', (palette) => {
     applyAppearance({ theme: 'light', palette, density: 'comfortable' })
     const icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
-    const expectedHref = palette === 'default' ? '/icons/icon.svg' : `/icons/icon-${palette}.svg`
-    expect(icon?.getAttribute('href')).toBe(expectedHref)
+    expect(icon?.getAttribute('href')).toBe('/favicon.svg')
   })
 
   it.each(
@@ -288,13 +301,5 @@ describe('applyAppearance: icon and theme-color', () => {
     } finally {
       window.matchMedia = origMatchMedia
     }
-  })
-})
-
-describe('icon files', () => {
-  it.each(PALETTES)('public/icons has an icon file for palette "%s"', (palette) => {
-    const filename = palette === 'default' ? 'icon.svg' : `icon-${palette}.svg`
-    const iconPath = path.resolve(__dirname, '../../public/icons', filename)
-    expect(fs.existsSync(iconPath)).toBe(true)
   })
 })

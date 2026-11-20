@@ -3,12 +3,14 @@ import { useEffect, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api, unwrap } from '../../api/client'
 import { getAuthErrorMessage, useBusyRetry } from '../../auth/messages'
+import { clearIntroFlag, setIntroFlag } from '../../auth/intro-flag'
 import { leaveSignInWhenSignedIn, validateNextSearch } from '../../auth/guard'
 import { signInShown } from '../../auth/unauthorized'
 import { useSignIn } from '../../auth/signIn'
 import { safeNext } from '../../auth/next'
 import { queryKeys } from '../../lib/queryKeys'
 import { oidcErrorMessage } from '../../components/auth/oidc-messages'
+import { Wordmark } from '../../components/brand/wordmark'
 import { Button } from '../../components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card'
 import { Input } from '../../components/ui/input'
@@ -31,7 +33,10 @@ function SignIn() {
   })
   // The page before this one is gone now: sign-out and the 401 handler forget
   // the session's cached data only then (src/auth/unauthorized.ts).
-  useEffect(() => signInShown(), [])
+  useEffect(() => {
+    signInShown()
+    clearIntroFlag()
+  }, [])
   const signIn = useSignIn(next)
 
   const { submit: handleSignIn, retried } = useBusyRetry(
@@ -58,7 +63,9 @@ function SignIn() {
     <main className="flex min-h-screen w-full items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm border-border shadow-lg">
         <CardHeader className="pb-4 text-center">
-          <p className="font-mono text-sm font-bold tracking-tight text-primary">Ferricade</p>
+          <div className="mb-2 flex justify-center">
+            <Wordmark variant="rust" className="h-9 w-auto max-w-full" />
+          </div>
           <CardTitle>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">Sign in</h1>
           </CardTitle>
@@ -77,6 +84,7 @@ function SignIn() {
               <a
                 className="flex h-9 w-full items-center justify-center rounded-md border border-input text-sm font-medium text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 href={`/admin/api/v1/auth/oidc/start?next=${encodeURIComponent(safeNext(next))}`}
+                onClick={() => setIntroFlag()}
               >
                 Sign in with {oidc.data.display_name}
               </a>

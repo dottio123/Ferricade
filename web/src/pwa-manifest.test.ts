@@ -33,8 +33,8 @@ describe('PWA manifest', () => {
       start_url: '/',
       scope: '/',
       display: 'standalone',
-      background_color: '#ffffff',
-      theme_color: '#4338ca',
+      background_color: '#181A1D',
+      theme_color: '#181A1D',
     })
   })
 

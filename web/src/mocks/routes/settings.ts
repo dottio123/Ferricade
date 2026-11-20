@@ -288,7 +288,7 @@ export function settingsRoutes(env: Env): HttpHandler[] {
 
     route(env, 'mfa', 'put', `${V1}/me/preferences`, async ({ request, respond, actor }) => {
       type PreferencesPut = Omit<Body<`${typeof V1}/me/preferences`, 'put'>, 'palette'> & {
-        palette?: 'default' | 'graphite' | 'ocean' | 'violet' | 'moss' | 'sandstone'
+        palette?: 'ferricade' | 'indigo' | 'graphite' | 'ocean' | 'violet' | 'moss' | 'sandstone'
       }
       const body = await readBody<PreferencesPut>(request, {
         preset: req(str({ values: ['homelab', 'business', 'wall', 'custom'] })),
@@ -303,7 +303,9 @@ export function settingsRoutes(env: Env): HttpHandler[] {
         ),
         pinned_device_ids: req(arr(str({ format: 'uuid' }), { max: 24, unique: true })),
         theme: req(str({ values: ['dark', 'light', 'system'] })),
-        palette: str({ values: ['default', 'graphite', 'ocean', 'violet', 'moss', 'sandstone'] }),
+        palette: str({
+          values: ['ferricade', 'indigo', 'graphite', 'ocean', 'violet', 'moss', 'sandstone'],
+        }),
         density: req(str({ values: ['comfortable', 'compact'] })),
         toast_seconds: { kind: 'integer', min: 0, max: 30 },
       })
@@ -312,7 +314,7 @@ export function settingsRoutes(env: Env): HttpHandler[] {
           return respond.error(
             400,
             'bad_request',
-            'palette must be default, graphite, ocean, violet, moss or sandstone',
+            'palette must be ferricade, indigo, graphite, ocean, violet, moss or sandstone',
           )
         return respond.failure(body)
       }

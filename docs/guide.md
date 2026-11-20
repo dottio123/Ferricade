@@ -369,7 +369,7 @@ readable `message`. For example:
   "user": {"id": "<user-id>", "name": "Operator", "roles": ["admin"]},
   "source": {"ip": "<client-address>"},
   "ferricade": {"target": {"type": "device", "id": "<device-id>", "name": "Example device"}, "device": {"rustdesk_id": "123456789"}, "details": {}},
-  "observer": {"product": "Ferricade", "version": "2.0.0", "hostname": "admin.example.com"}
+  "observer": {"product": "Ferricade", "version": "2.1.0", "hostname": "admin.example.com"}
 }
 ```
 

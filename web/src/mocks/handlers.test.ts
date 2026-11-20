@@ -1289,7 +1289,7 @@ describe('the medium mock against the contract', () => {
       200,
     )) as Schemas['Preferences']
     expect(prefs.preset).toBe('business')
-    expect(prefs.palette).toBe('default')
+    expect(prefs.palette).toBe('ferricade')
     expect(prefs.toast_seconds).toBe(5)
     const next: Schemas['Preferences'] = {
       ...prefs,
@@ -1338,7 +1338,7 @@ describe('the medium mock against the contract', () => {
       expect(invalid).toMatchObject({
         error: {
           code: 'bad_request',
-          message: 'palette must be default, graphite, ocean, violet, moss or sandstone',
+          message: 'palette must be ferricade, indigo, graphite, ocean, violet, moss or sandstone',
         },
       })
     }

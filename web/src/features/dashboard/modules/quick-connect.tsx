@@ -130,7 +130,7 @@ export function QuickConnectModule({
           <Link
             to="/devices"
             aria-label="View all devices"
-            className="text-xs font-medium text-primary hover:underline"
+            className="text-xs font-medium text-primary-text hover:underline"
           >
             View all
           </Link>
@@ -144,7 +144,7 @@ export function QuickConnectModule({
           <span className="text-muted-foreground">Connected to client</span>
           <a
             href={connectResult.url}
-            className="text-primary hover:underline font-semibold inline-flex items-center gap-1"
+            className="text-primary-text hover:underline font-semibold inline-flex items-center gap-1"
           >
             <span>Open in RustDesk</span>
             <ExternalLinkIcon className="size-3" />

@@ -47,7 +47,7 @@ test.describe('Groups and automatic sorting', () => {
     await page.getByRole('link', { name: 'View approval queue' }).click()
     const card = page.locator('[data-device-id]').filter({ hasNotText: 'w-sf-it-1' }).first()
     await expect(card).toBeVisible()
-    const deviceName = (await card.innerText()).split('\n').find((line) => line.trim())!
+    const deviceName = await card.locator('[data-slot="card-title"]').innerText()
     await card.getByRole('button', { name: 'Approve' }).click()
     await expect(page.getByRole('dialog', { name: 'Resolve Group Conflict' })).toHaveCount(0)
     await expect(page.getByText('Device approved', { exact: true })).toBeVisible()

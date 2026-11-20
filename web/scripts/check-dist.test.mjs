@@ -24,6 +24,8 @@ function build(extra = {}, head = `${NONCE_META}<link rel="manifest" href="/mani
   writeFileSync(join(dir, 'assets', 'index.js'), 'console.log("app")')
   writeFileSync(join(dir, 'manifest.json'), '{}')
   writeFileSync(join(dir, 'sw.js'), "self.addEventListener('fetch', () => {})")
+  writeFileSync(join(dir, 'favicon.svg'), '<svg/>')
+  writeFileSync(join(dir, 'favicon.ico'), 'ico')
   for (const [name, content] of Object.entries(extra)) writeFileSync(join(dir, name), content)
   return dir
 }
@@ -43,6 +45,14 @@ describe('check-dist', () => {
   })
 
   it.each(['manifest.json', 'sw.js'])('fails when %s is missing', (name) => {
+    const dir = build()
+    rmSync(join(dir, name))
+    const r = check(dir)
+    expect(r.code).toBe(1)
+    expect(r.out).toContain(name)
+  })
+
+  it.each(['favicon.svg', 'favicon.ico'])('fails when %s is missing', (name) => {
     const dir = build()
     rmSync(join(dir, name))
     const r = check(dir)

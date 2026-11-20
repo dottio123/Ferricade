@@ -238,7 +238,7 @@ export function DeviceConnectSection({
                 </span>
                 <a
                   href={connectResult.url}
-                  className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-primary hover:underline font-semibold"
+                  className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-primary-text hover:underline font-semibold"
                 >
                   <span>Open in RustDesk</span>
                   <ExternalLinkIcon className="size-3" />

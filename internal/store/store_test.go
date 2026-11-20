@@ -18,6 +18,48 @@ import (
 	"github.com/dottio123/ferricade/internal/store/db"
 )
 
+func TestFerricadePaletteMigrationMapsStoredValues(t *testing.T) {
+	pool := store.NewTestDB(t)
+	ctx := context.Background()
+	sqlDB := stdlib.OpenDBFromPool(pool)
+	defer sqlDB.Close()
+	provider, err := goose.NewProvider(goose.DialectPostgres, sqlDB, os.DirFS("migrations"))
+	require.NoError(t, err)
+	_, err = provider.DownTo(ctx, 29)
+	require.NoError(t, err)
+
+	for name, palette := range map[string]string{
+		"palette-default": "default",
+		"palette-indigo":  "indigo",
+		"palette-moss":    "moss",
+	} {
+		var id string
+		require.NoError(t, pool.QueryRow(ctx,
+			`INSERT INTO users (username, role, password_hash) VALUES ($1, 'admin', 'x') RETURNING id`, name).Scan(&id))
+		_, err = pool.Exec(ctx,
+			`INSERT INTO user_preferences (user_id, prefs, updated_at) VALUES ($1, jsonb_build_object('palette', $2::text), now())`, id, palette)
+		require.NoError(t, err)
+	}
+	_, err = provider.Up(ctx)
+	require.NoError(t, err)
+	var got string
+	require.NoError(t, pool.QueryRow(ctx, `SELECT prefs->>'palette' FROM user_preferences p JOIN users u ON u.id = p.user_id WHERE u.username = 'palette-default'`).Scan(&got))
+	require.Equal(t, "ferricade", got)
+	require.NoError(t, pool.QueryRow(ctx, `SELECT prefs->>'palette' FROM user_preferences p JOIN users u ON u.id = p.user_id WHERE u.username = 'palette-indigo'`).Scan(&got))
+	require.Equal(t, "indigo", got)
+	require.NoError(t, pool.QueryRow(ctx, `SELECT prefs->>'palette' FROM user_preferences p JOIN users u ON u.id = p.user_id WHERE u.username = 'palette-moss'`).Scan(&got))
+	require.Equal(t, "moss", got)
+
+	_, err = provider.DownTo(ctx, 29)
+	require.NoError(t, err)
+	require.NoError(t, pool.QueryRow(ctx, `SELECT prefs->>'palette' FROM user_preferences p JOIN users u ON u.id = p.user_id WHERE u.username = 'palette-default'`).Scan(&got))
+	require.Equal(t, "default", got)
+	require.NoError(t, pool.QueryRow(ctx, `SELECT prefs->>'palette' FROM user_preferences p JOIN users u ON u.id = p.user_id WHERE u.username = 'palette-indigo'`).Scan(&got))
+	require.Equal(t, "default", got)
+	require.NoError(t, pool.QueryRow(ctx, `SELECT prefs->>'palette' FROM user_preferences p JOIN users u ON u.id = p.user_id WHERE u.username = 'palette-moss'`).Scan(&got))
+	require.Equal(t, "moss", got)
+}
+
 func TestMigrateIsIdempotent(t *testing.T) {
 	pool := store.NewTestDB(t)
 	ctx := context.Background()

@@ -285,7 +285,7 @@ export function AuditFilterBar({
           {filters.target && (
             <Badge
               variant="secondary"
-              className="h-7 px-2 text-xs gap-1.5 bg-primary/10 text-primary border border-primary/20 w-fit"
+              className="h-7 px-2 text-xs gap-1.5 bg-primary/10 text-primary-text border border-primary/20 w-fit"
             >
               <span>Target: {filters.target.slice(0, 10)}…</span>
               <button

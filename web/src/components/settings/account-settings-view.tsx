@@ -253,7 +253,7 @@ export function AccountSettingsView() {
           {!isEnrollingTotp ? (
             <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <div className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary-text">
                   <ShieldCheckIcon className="size-5" />
                 </div>
                 <div className="flex flex-col">

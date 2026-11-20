@@ -111,7 +111,7 @@ function renderDeviceDetail(
           pinned_device_ids: [],
           preset: 'business',
           theme: 'system',
-          palette: 'default',
+          palette: 'ferricade',
           density: 'comfortable',
           modules: [],
         },
@@ -141,6 +141,21 @@ describe('DeviceDetail Policy Section & Alerts', () => {
   afterEach(() => {
     cleanup()
     vi.clearAllMocks()
+  })
+
+  it('sends empty alias and note when clearing them', async () => {
+    const patch = vi.spyOn(api, 'PATCH').mockResolvedValue({
+      response: new Response(),
+      data: makeDevice({ alias: '', note: '' }),
+    } as never)
+    renderDeviceDetail(makeDevice({ note: 'desk note' }))
+
+    fireEvent.change(await screen.findByLabelText('Alias (max 128)'), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('Note (max 4096)'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() => expect(patch).toHaveBeenCalled())
+    expect(patch.mock.calls[0]?.[1]?.body).toMatchObject({ alias: '', note: '' })
   })
 
   it('renders audit conflict counts after the group description', async () => {

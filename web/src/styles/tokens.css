@@ -21,7 +21,9 @@
 
   /* Primary (Electric Indigo / Violet) */
   --primary: #4338ca;
+  --primary-text: var(--primary);
   --primary-foreground: #ffffff;
+  --brand-ink: #3730a3;
 
   /* Secondary & Muted */
   --secondary: #f1f5f9;
@@ -113,7 +115,9 @@
 
     /* Primary: light indigo with dark text for contrast AA */
     --primary: #818cf8;
+    --primary-text: var(--primary);
     --primary-foreground: #0b0f19;
+    --brand-ink: #c7d2fe;
 
     /* Secondary & Muted */
     --secondary: #1e293b;
@@ -175,7 +179,9 @@
 
   /* Primary: light indigo with dark text for contrast AA */
   --primary: #818cf8;
+  --primary-text: var(--primary);
   --primary-foreground: #0b0f19;
+  --brand-ink: #c7d2fe;
 
   /* Secondary & Muted */
   --secondary: #1e293b;
@@ -220,6 +226,200 @@
 }
 
 /* ==========================================================================
+   Theme: Ferricade
+   ========================================================================== */
+
+[data-palette='ferricade'],
+[data-palette='ferricade'][data-theme='light'] {
+  /* Surfaces & Text */
+  --background: #f0eeeb;
+  --foreground: #2b2e33;
+  --card: #f8f6f2;
+  --card-foreground: #2b2e33;
+  --popover: #f8f6f2;
+  --popover-foreground: #2b2e33;
+
+  /* Surface elevation levels */
+  --surface-1: #f8f6f2;
+  --surface-2: #e4dfd7;
+  --surface-3: #dad3c9;
+
+  /* Primary */
+  --primary: #b7410e;
+  /* Text uses a contrast-safe rust shade while fills keep the exact brand colors. */
+  --primary-text: #9e360e;
+  --primary-foreground: #fcfaf7;
+  --brand-ink: #2b2e33;
+
+  /* Secondary & Muted */
+  --secondary: #e4dfd7;
+  --secondary-foreground: #2b2e33;
+  --muted: #e4dfd7;
+  --muted-foreground: #49433d;
+
+  /* Accent */
+  --accent: #e4dfd7;
+  --accent-foreground: #2b2e33;
+
+  /* Chrome & Navigation Active */
+  --chrome: #ece7e0;
+  --chrome-foreground: #2b2e33;
+  --nav-active: #eddcd3;
+  --nav-active-foreground: #8f300a;
+
+  /* Destructive */
+  --destructive: #c92a22;
+  --destructive-foreground: #ffffff;
+  --destructive-text: #a61b1b;
+
+  /* Borders & Focus Ring */
+  --border: #d7d0c5;
+  --input: #c9c1b5;
+  --ring: #b7410e;
+
+  /* Status Colors */
+  --status-online: #15803d;
+  --status-online-fg: #14532d;
+  --status-pending: #744706;
+  --status-offline: #544e48;
+  --status-alert: #991b1b;
+  --status-live: #9e360e;
+
+  /* Charts */
+  --chart-1: #b7410e;
+  --chart-2: #15803d;
+  --chart-3: #a16207;
+  --chart-4: #b91c1c;
+  --chart-5: #2c5d7c;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-palette='ferricade']:not([data-theme='light']) {
+    /* Surfaces & Text */
+    --background: #181a1d;
+    --foreground: #ece6dc;
+    --card: #232120;
+    --card-foreground: #ece6dc;
+    --popover: #232120;
+    --popover-foreground: #ece6dc;
+
+    /* Surface elevation levels */
+    --surface-1: #232120;
+    --surface-2: #2e2b29;
+    --surface-3: #3a3633;
+
+    /* Primary */
+    --primary: #d65c26;
+    --primary-text: #ea9266;
+    --primary-foreground: #141517;
+    --brand-ink: #ece6dc;
+
+    /* Secondary & Muted */
+    --secondary: #2e2b29;
+    --secondary-foreground: #ece6dc;
+    --muted: #2e2b29;
+    --muted-foreground: #b8b0a3;
+
+    /* Accent */
+    --accent: #2e2b29;
+    --accent-foreground: #ece6dc;
+
+    /* Chrome & Navigation Active */
+    --chrome: #1d1c1b;
+    --chrome-foreground: #ece6dc;
+    --nav-active: #38251e;
+    --nav-active-foreground: #f4b08c;
+
+    /* Destructive */
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+    --destructive-text: #f87171;
+
+    /* Borders & Focus Ring */
+    --border: #35312e;
+    --input: #494440;
+    --ring: #d65c26;
+
+    /* Status Colors */
+    --status-online: #22c55e;
+    --status-online-fg: #22c55e;
+    --status-pending: #f59e0b;
+    --status-offline: #a0988c;
+    --status-alert: #f87171;
+    --status-live: #ea9266;
+
+    /* Charts */
+    --chart-1: #d65c26;
+    --chart-2: #22c55e;
+    --chart-3: #f59e0b;
+    --chart-4: #f87171;
+    --chart-5: #5ea9d6;
+  }
+}
+
+[data-palette='ferricade'][data-theme='dark'] {
+  /* Surfaces & Text */
+  --background: #181a1d;
+  --foreground: #ece6dc;
+  --card: #232120;
+  --card-foreground: #ece6dc;
+  --popover: #232120;
+  --popover-foreground: #ece6dc;
+
+  /* Surface elevation levels */
+  --surface-1: #232120;
+  --surface-2: #2e2b29;
+  --surface-3: #3a3633;
+
+  /* Primary */
+  --primary: #d65c26;
+  --primary-text: #ea9266;
+  --primary-foreground: #141517;
+  --brand-ink: #ece6dc;
+
+  /* Secondary & Muted */
+  --secondary: #2e2b29;
+  --secondary-foreground: #ece6dc;
+  --muted: #2e2b29;
+  --muted-foreground: #b8b0a3;
+
+  /* Accent */
+  --accent: #2e2b29;
+  --accent-foreground: #ece6dc;
+
+  /* Chrome & Navigation Active */
+  --chrome: #1d1c1b;
+  --chrome-foreground: #ece6dc;
+  --nav-active: #38251e;
+  --nav-active-foreground: #f4b08c;
+
+  /* Destructive */
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --destructive-text: #f87171;
+
+  /* Borders & Focus Ring */
+  --border: #35312e;
+  --input: #494440;
+  --ring: #d65c26;
+
+  /* Status Colors */
+  --status-online: #22c55e;
+  --status-online-fg: #22c55e;
+  --status-pending: #f59e0b;
+  --status-offline: #a0988c;
+  --status-alert: #f87171;
+  --status-live: #ea9266;
+
+  /* Charts */
+  --chart-1: #d65c26;
+  --chart-2: #22c55e;
+  --chart-3: #f59e0b;
+  --chart-4: #f87171;
+  --chart-5: #5ea9d6;
+}
+
+/* ==========================================================================
    Theme: Graphite
    ========================================================================== */
 
@@ -241,6 +441,7 @@
   /* Primary */
   --primary: #18181b;
   --primary-foreground: #fafafa;
+  --brand-ink: #3f3f46;
 
   /* Secondary & Muted */
   --secondary: #f4f4f5;
@@ -302,6 +503,7 @@
     /* Primary */
     --primary: #f4f4f5;
     --primary-foreground: #09090b;
+    --brand-ink: #d4d4d8;
 
     /* Secondary & Muted */
     --secondary: #18181b;
@@ -363,6 +565,7 @@
   /* Primary */
   --primary: #f4f4f5;
   --primary-foreground: #09090b;
+  --brand-ink: #d4d4d8;
 
   /* Secondary & Muted */
   --secondary: #18181b;
@@ -428,6 +631,7 @@
   /* Primary */
   --primary: #0369a1;
   --primary-foreground: #ffffff;
+  --brand-ink: #075985;
 
   /* Secondary & Muted */
   --secondary: #f1f5f9;
@@ -489,6 +693,7 @@
     /* Primary */
     --primary: #38bdf8;
     --primary-foreground: #07131e;
+    --brand-ink: #7dd3fc;
 
     /* Secondary & Muted */
     --secondary: #13283c;
@@ -550,6 +755,7 @@
   /* Primary */
   --primary: #38bdf8;
   --primary-foreground: #07131e;
+  --brand-ink: #7dd3fc;
 
   /* Secondary & Muted */
   --secondary: #13283c;
@@ -615,6 +821,7 @@
   /* Primary */
   --primary: #6d28d9;
   --primary-foreground: #ffffff;
+  --brand-ink: #5b21b6;
 
   /* Secondary & Muted */
   --secondary: #f5f3fa;
@@ -676,6 +883,7 @@
     /* Primary */
     --primary: #a78bfa;
     --primary-foreground: #0f0c1b;
+    --brand-ink: #c4b5fd;
 
     /* Secondary & Muted */
     --secondary: #241e3d;
@@ -737,6 +945,7 @@
   /* Primary */
   --primary: #a78bfa;
   --primary-foreground: #0f0c1b;
+  --brand-ink: #c4b5fd;
 
   /* Secondary & Muted */
   --secondary: #241e3d;
@@ -802,6 +1011,7 @@
   /* Primary */
   --primary: #3f5a2a;
   --primary-foreground: #ffffff;
+  --brand-ink: #365322;
 
   /* Secondary & Muted */
   --secondary: #edf1eb;
@@ -863,6 +1073,7 @@
     /* Primary */
     --primary: #a3b88c;
     --primary-foreground: #101411;
+    --brand-ink: #c2d4ac;
 
     /* Secondary & Muted */
     --secondary: #222923;
@@ -924,6 +1135,7 @@
   /* Primary */
   --primary: #a3b88c;
   --primary-foreground: #101411;
+  --brand-ink: #c2d4ac;
 
   /* Secondary & Muted */
   --secondary: #222923;
@@ -989,6 +1201,7 @@
   /* Primary */
   --primary: #54462e;
   --primary-foreground: #ffffff;
+  --brand-ink: #54462e;
 
   /* Secondary & Muted */
   --secondary: #f4efe8;
@@ -1050,6 +1263,7 @@
     /* Primary */
     --primary: #bfa674;
     --primary-foreground: #141210;
+    --brand-ink: #d6c297;
 
     /* Secondary & Muted */
     --secondary: #292420;
@@ -1111,6 +1325,7 @@
   /* Primary */
   --primary: #bfa674;
   --primary-foreground: #141210;
+  --brand-ink: #d6c297;
 
   /* Secondary & Muted */
   --secondary: #292420;

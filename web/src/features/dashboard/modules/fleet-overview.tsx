@@ -418,7 +418,7 @@ export function FleetOverviewModule({
                   to="/devices"
                   search={{ group: 'ungrouped' } as unknown as Record<string, unknown>}
                   title={row.name}
-                  className="text-xs font-medium text-foreground hover:text-primary hover:underline truncate focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-xs"
+                  className="text-xs font-medium text-foreground hover:text-primary-text hover:underline truncate focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-xs"
                 >
                   {row.name}
                 </Link>
@@ -427,7 +427,7 @@ export function FleetOverviewModule({
                   to="/devices"
                   search={{ group: row.id, subgroups: true } as unknown as Record<string, unknown>}
                   title={row.name}
-                  className="text-xs font-medium text-foreground hover:text-primary hover:underline truncate focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-xs"
+                  className="text-xs font-medium text-foreground hover:text-primary-text hover:underline truncate focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring rounded-xs"
                 >
                   {row.name}
                 </Link>
@@ -520,7 +520,7 @@ export function FleetOverviewModule({
           <Link
             to="/devices"
             aria-label="View all devices"
-            className="text-xs font-medium text-primary hover:underline"
+            className="text-xs font-medium text-primary-text hover:underline"
           >
             View all
           </Link>

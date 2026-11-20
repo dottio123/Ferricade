@@ -81,7 +81,7 @@ export function SessionsFilterBar({
           {filters.device_id && (
             <Badge
               variant="secondary"
-              className="h-7 px-2 text-xs gap-1.5 bg-primary/10 text-primary border border-primary/20 w-fit"
+              className="h-7 px-2 text-xs gap-1.5 bg-primary/10 text-primary-text border border-primary/20 w-fit"
             >
               <span>Device: {selectedDeviceName || filters.device_id.slice(0, 8)}</span>
               <button

@@ -467,7 +467,7 @@ export function BulkActionBar({
               checked={queue.allSelected}
               onChange={queue.onToggleSelectAll}
               disabled={isRunning}
-              className="size-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
+              className="size-4 rounded border-input text-primary-text focus:ring-ring cursor-pointer"
             />
             <span>Select all visible ({queue.devices.length})</span>
           </label>

@@ -41,7 +41,7 @@ import { groupsQueryOptions } from '@/lib/queries'
 import { useRejectDevices } from './use-reject-devices'
 import { useApproveDevices } from './use-approve-devices'
 import { ApproveRejectActions } from './approve-reject-actions'
-import { textColorFor, toCss } from '@/lib/tagColor'
+import { pageBackgroundColor, textColorFor, toCss } from '@/lib/tagColor'
 import { useAllTags } from '@/lib/tags'
 import { cn } from '@/lib/utils'
 import { deviceName, deviceStatus } from '@/lib/device'
@@ -313,8 +313,8 @@ export function DeviceDetail({ deviceId, onClose, className }: DeviceDetailProps
 
   const handleSave = () => {
     patchMutation.mutate({
-      alias: alias.trim() || undefined,
-      note: note || undefined,
+      alias: alias.trim(),
+      note,
       group_id: groupId,
       tag_ids: tagIds,
     })
@@ -684,9 +684,13 @@ export function DeviceDetail({ deviceId, onClose, className }: DeviceDetailProps
               ) : (
                 device.tags.map((t) => (
                   <span
+                    data-slot="tag-label"
                     key={t.id}
                     className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                    style={{ backgroundColor: toCss(t.color), color: textColorFor(t.color) }}
+                    style={{
+                      backgroundColor: toCss(t.color),
+                      color: textColorFor(t.color, pageBackgroundColor()),
+                    }}
                   >
                     {t.name}
                   </span>
@@ -765,11 +769,12 @@ export function DeviceDetail({ deviceId, onClose, className }: DeviceDetailProps
                     const color = tagObj?.color ?? 0
                     return (
                       <span
+                        data-slot="tag-label"
                         key={tid}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
                         style={{
                           backgroundColor: toCss(color),
-                          color: textColorFor(color),
+                          color: textColorFor(color, pageBackgroundColor()),
                         }}
                       >
                         {name}

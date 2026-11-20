@@ -7,6 +7,7 @@ import { api, unwrap } from '../api/client'
 import type { paths } from '../api/schema'
 import { queryKeys } from '../lib/queryKeys'
 import { resumeLive, suspendLive } from '../live/connection'
+import { setIntroFlag } from './intro-flag'
 import { safeNext } from './next'
 import { forgetSessionData, whenSignInShows } from './unauthorized'
 
@@ -35,6 +36,9 @@ function useContinue(next: string | undefined, step: 'sign-in' | 'totp') {
 export function useSignIn(next: string | undefined) {
   const onSuccess = useContinue(next, 'sign-in')
   return useMutation({
+    onMutate: () => {
+      setIntroFlag()
+    },
     mutationFn: (body: Json<'/admin/api/v1/auth/login'>) =>
       unwrap(api.POST('/admin/api/v1/auth/login', { body })),
     onSuccess,

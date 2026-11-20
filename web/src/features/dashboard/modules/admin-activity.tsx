@@ -51,7 +51,7 @@ export function AdminActivityModule({
           <Link
             to="/audit"
             aria-label="View audit log"
-            className="text-xs font-medium text-primary hover:underline"
+            className="text-xs font-medium text-primary-text hover:underline"
           >
             View all
           </Link>

@@ -90,7 +90,7 @@ describe('useThemeSwitch palette', () => {
       await waitFor(() => expect(result.current.isLoading).toBe(false))
       act(() => result.current.setPalette('violet'))
       await waitFor(() => expect(result.current.error).toBeTruthy())
-      expect(document.documentElement.hasAttribute('data-palette')).toBe(false)
+      expect(document.documentElement.dataset.palette).toBe('ferricade')
     } finally {
       server.close()
     }

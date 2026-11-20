@@ -101,7 +101,7 @@ export function presetPreferences(
     ],
     pinned_device_ids: pinned,
     theme: 'system',
-    palette: 'default',
+    palette: 'ferricade',
     density: 'comfortable',
     toast_seconds: 5,
   }

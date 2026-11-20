@@ -113,7 +113,7 @@ function mockApi() {
           pinned_device_ids: [],
           preset: 'business',
           theme: 'system',
-          palette: 'default',
+          palette: 'ferricade',
           density: 'comfortable',
           modules: [],
         },

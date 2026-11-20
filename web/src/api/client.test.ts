@@ -34,7 +34,7 @@ const prefs: components['schemas']['Preferences'] = {
   modules: [],
   pinned_device_ids: [],
   theme: 'system',
-  palette: 'default',
+  palette: 'ferricade',
   density: 'comfortable',
   toast_seconds: 5,
 }

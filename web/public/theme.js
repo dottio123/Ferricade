@@ -13,25 +13,21 @@
   if (typeof cached !== 'object' || cached === null) cached = {}
   var theme = ['dark', 'light', 'system'].indexOf(cached.theme) >= 0 ? cached.theme : 'system'
   var palette =
-    ['default', 'graphite', 'ocean', 'violet', 'moss', 'sandstone'].indexOf(cached.palette) >= 0
-      ? cached.palette
-      : 'default'
+    cached.palette === 'default'
+      ? 'ferricade'
+      : ['ferricade', 'indigo', 'graphite', 'ocean', 'violet', 'moss', 'sandstone'].indexOf(
+            cached.palette,
+          ) >= 0
+        ? cached.palette
+        : 'ferricade'
   var density =
     ['comfortable', 'compact'].indexOf(cached.density) >= 0 ? cached.density : 'comfortable'
   var root = document.documentElement
   if (theme === 'system') root.removeAttribute('data-theme')
   else root.setAttribute('data-theme', theme)
-  if (palette === 'default') root.removeAttribute('data-palette')
+  if (palette === 'indigo') root.removeAttribute('data-palette')
   else root.setAttribute('data-palette', palette)
   root.setAttribute('data-density', density)
-
-  var icon = document.querySelector('link[rel="icon"]')
-  if (icon) {
-    icon.setAttribute(
-      'href',
-      palette === 'default' ? '/icons/icon.svg' : '/icons/icon-' + palette + '.svg',
-    )
-  }
 
   var metaTheme = document.querySelector('meta[name="theme-color"]')
   if (metaTheme) {
@@ -43,7 +39,8 @@
         window.matchMedia('(prefers-color-scheme: dark)').matches)
     var mode = isDark ? 'dark' : 'light'
     var themeColors = {
-      default: { light: '#4338ca', dark: '#0f1322' },
+      ferricade: { light: '#F0EEEB', dark: '#181A1D' },
+      indigo: { light: '#4338ca', dark: '#0f1322' },
       graphite: { light: '#18181b', dark: '#111114' },
       ocean: { light: '#0369a1', dark: '#0a1724' },
       violet: { light: '#6d28d9', dark: '#140f24' },

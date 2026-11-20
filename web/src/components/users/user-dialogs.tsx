@@ -528,7 +528,7 @@ function EditUserForm({
                 type="checkbox"
                 checked={confirmedSelfChange}
                 onChange={(e) => setConfirmedSelfChange(e.target.checked)}
-                className="size-4 shrink-0 rounded border-border text-primary accent-primary focus:ring-primary"
+                className="size-4 shrink-0 rounded border-border text-primary-text accent-primary focus:ring-primary"
               />
               <span>I understand and wish to proceed</span>
             </label>

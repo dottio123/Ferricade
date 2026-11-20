@@ -1,13 +1,15 @@
 import { CheckIcon } from 'lucide-react'
 import { AccountNavTabs } from '@/components/account/account-nav-tabs'
 import { ErrorState } from '@/components/brand/error-state'
+import { Wordmark } from '@/components/brand/wordmark'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PageHeader } from '@/components/page-header'
 import { useThemeSwitch } from '@/features/appearance/use-theme-switch'
 import { PALETTES, useResolvedMode, type Palette, type Theme } from '@/lib/appearance'
 
 const paletteLabels: Record<Palette, string> = {
-  default: 'Default',
+  ferricade: 'Ferricade',
+  indigo: 'Indigo',
   graphite: 'Graphite',
   ocean: 'Ocean',
   violet: 'Violet',
@@ -17,7 +19,7 @@ const paletteLabels: Record<Palette, string> = {
 const modes: readonly Theme[] = ['light', 'dark', 'system']
 
 function MiniScreen({ palette, mode }: { palette: Palette; mode: 'light' | 'dark' }) {
-  const paletteAttr = palette === 'default' ? {} : { 'data-palette': palette }
+  const paletteAttr = palette === 'indigo' ? {} : { 'data-palette': palette }
   return (
     <div
       aria-hidden="true"
@@ -26,10 +28,8 @@ function MiniScreen({ palette, mode }: { palette: Palette; mode: 'light' | 'dark
       className="relative flex h-20 w-full flex-col overflow-hidden rounded-md border border-border bg-background select-none"
     >
       {/* Top Header Bar */}
-      <div className="flex h-5 shrink-0 items-center justify-between border-b border-border bg-chrome px-2">
-        <span className="font-mono text-2xs font-bold tracking-tight text-primary leading-none">
-          Ferricade
-        </span>
+      <div className="flex h-5 shrink-0 items-center justify-between border-b border-border bg-chrome px-2 text-chrome-foreground">
+        <Wordmark variant="flat" decorative className="h-2.5 w-auto" />
         <div className="flex items-center gap-1.5">
           <div className="h-1.5 w-6 rounded-full bg-muted" />
           <span className="size-1.5 rounded-full bg-status-online" />
@@ -127,7 +127,7 @@ export function AppearanceSettingsView() {
                   <span className="flex items-center justify-between gap-2 text-sm font-medium text-card-foreground">
                     <span className="min-w-0 truncate">{paletteLabels[option]}</span>
                     <CheckIcon
-                      className={`size-4 shrink-0 text-primary ${
+                      className={`size-4 shrink-0 text-primary-text ${
                         palette === option ? '' : 'invisible'
                       }`}
                       aria-hidden="true"

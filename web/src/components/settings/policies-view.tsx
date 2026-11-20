@@ -254,7 +254,7 @@ export function PoliciesView() {
             . Group and device lists add to it.{' '}
             <Link
               to="/settings/id-allow-list"
-              className="font-medium text-foreground underline underline-offset-4 hover:text-primary"
+              className="font-medium text-foreground underline underline-offset-4 hover:text-primary-text"
             >
               Edit the Global ID Allowlist
             </Link>

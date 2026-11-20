@@ -4,9 +4,9 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { Palette } from '@/lib/appearance'
 
-// t14 adds the other four.
 const THEMES = [
-  'default',
+  'ferricade',
+  'indigo',
   'graphite',
   'ocean',
   'violet',
@@ -86,15 +86,15 @@ function extractThemeTokens(palette: Palette): {
 } {
   const esc = palette.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const lightSelector =
-    palette === 'default'
+    palette === 'indigo'
       ? '^:root\\s*,\\s*\\[data-theme=["\']light["\']\\]'
       : `^\\[data-palette=["']${esc}["']\\],\\s*\\n\\[data-palette=["']${esc}["']\\]\\[data-theme=["']light["']\\]`
   const darkSelector =
-    palette === 'default'
+    palette === 'indigo'
       ? '^\\[data-theme=["\']dark["\']\\]'
       : `^\\[data-palette=["']${esc}["']\\]\\[data-theme=["']dark["']\\]`
   const mediaSelector =
-    palette === 'default'
+    palette === 'indigo'
       ? ':root:not\\(\\[data-theme=["\']light["\']\\]\\)'
       : `\\[data-palette=["']${esc}["']\\]:not\\(\\[data-theme=["']light["']\\]\\)`
   const lightBlockMatch = tokensRaw.match(
@@ -134,7 +134,9 @@ function extractThemeTokens(palette: Palette): {
   return { light, dark, mediaDark, names }
 }
 
-const DEFAULT_DARK_NAMES = extractThemeTokens('default').names.dark
+const DEFAULT_DARK_NAMES = extractThemeTokens('indigo').names.dark.filter(
+  (name) => name !== '--primary-text',
+)
 
 describe.each(THEMES)('Design tokens WCAG 2.2 AA contrast compliance: %s', (palette) => {
   const { light, dark, mediaDark, names } = extractThemeTokens(palette)
@@ -145,8 +147,13 @@ describe.each(THEMES)('Design tokens WCAG 2.2 AA contrast compliance: %s', (pale
   }
 
   it('defines a complete palette without redefining non-colour tokens', () => {
-    if (palette === 'default') {
+    if (palette === 'indigo') {
       expect(names.dark.every((name) => names.light.includes(name))).toBe(true)
+    } else if (palette === 'ferricade') {
+      const ferricadeNames = [...DEFAULT_DARK_NAMES, '--primary-text'].sort()
+      expect(names.light).toEqual(ferricadeNames)
+      expect(names.mediaDark).toEqual(ferricadeNames)
+      expect(names.dark).toEqual(ferricadeNames)
     } else {
       expect(names.light).toEqual(DEFAULT_DARK_NAMES)
       expect(names.mediaDark).toEqual(DEFAULT_DARK_NAMES)
@@ -154,10 +161,15 @@ describe.each(THEMES)('Design tokens WCAG 2.2 AA contrast compliance: %s', (pale
     }
   })
 
-  it('keeps Default colour values unchanged', () => {
-    if (palette !== 'default') return
+  it('keeps Indigo colour values unchanged', () => {
+    if (palette !== 'indigo') return
     // Never update this snapshot with -u; a theme task changes other blocks, never these.
-    expect({ light, dark }).toMatchInlineSnapshot(`
+    const { '--brand-ink': lightBrandInk, ...lightRest } = light
+    const { '--brand-ink': darkBrandInk, ...darkRest } = dark
+    expect(lightBrandInk).toBeDefined()
+    expect(darkBrandInk).toBeDefined()
+    expect(mediaDark['--brand-ink']).toBe(darkBrandInk)
+    expect({ light: lightRest, dark: darkRest }).toMatchInlineSnapshot(`
       {
         "dark": {
           "--accent": "#1e293b",
@@ -259,9 +271,59 @@ describe.each(THEMES)('Design tokens WCAG 2.2 AA contrast compliance: %s', (pale
   })
 
   it('--status-live equals --primary in both themes', () => {
-    expect(get(light, '--status-live')).toBe(get(light, '--primary'))
-    expect(get(dark, '--status-live')).toBe(get(dark, '--primary'))
-    expect(get(mediaDark, '--status-live')).toBe(get(mediaDark, '--primary'))
+    if (palette === 'ferricade') {
+      expect(get(light, '--status-live')).toBe(get(light, '--primary-text'))
+      expect(get(dark, '--status-live')).toBe(get(dark, '--primary-text'))
+      expect(get(mediaDark, '--status-live')).toBe(get(mediaDark, '--primary-text'))
+    } else {
+      expect(get(light, '--status-live')).toBe(get(light, '--primary'))
+      expect(get(dark, '--status-live')).toBe(get(dark, '--primary'))
+      expect(get(mediaDark, '--status-live')).toBe(get(mediaDark, '--primary'))
+    }
+  })
+
+  it('keeps Ferricade accent text at WCAG AA on its surfaces', () => {
+    if (palette !== 'ferricade') return
+    for (const tokens of [light, dark, mediaDark]) {
+      for (const surface of ['--background', '--card', '--chrome', '--nav-active']) {
+        expect(
+          contrastRatio(get(tokens, '--primary-text'), get(tokens, surface)),
+        ).toBeGreaterThanOrEqual(4.5)
+      }
+    }
+  })
+
+  it('keeps Ferricade alert labels at WCAG AA over tinted surfaces', () => {
+    if (palette !== 'ferricade') return
+    for (const surface of ['--background', '--card', '--muted', '--chrome']) {
+      const tinted = compositeColor(get(light, '--status-alert'), 0.15, get(light, surface))
+      expect(contrastRatio(get(light, '--status-alert'), tinted)).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('keeps Ferricade muted text at WCAG AA when rendered at 80% opacity', () => {
+    if (palette !== 'ferricade') return
+    for (const surface of ['--background', '--card', '--muted', '--chrome']) {
+      const muted = compositeColor(get(light, '--muted-foreground'), 0.8, get(light, surface))
+      expect(contrastRatio(muted, get(light, surface))).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('keeps the approved Ferricade ground, text, and brand accents', () => {
+    if (palette !== 'ferricade') return
+    expect([light['--background'], light['--foreground'], light['--primary']]).toEqual([
+      '#f0eeeb',
+      '#2b2e33',
+      '#b7410e',
+    ])
+    expect([dark['--background'], dark['--foreground'], dark['--primary']]).toEqual([
+      '#181a1d',
+      '#ece6dc',
+      '#d65c26',
+    ])
+    expect(light['--brand-ink']).toBe('#2b2e33')
+    expect(dark['--brand-ink']).toBe('#ece6dc')
+    expect(mediaDark['--brand-ink']).toBe('#ece6dc')
   })
 
   describe('Light Theme Contrast', () => {
@@ -381,6 +443,14 @@ describe.each(THEMES)('Design tokens WCAG 2.2 AA contrast compliance: %s', (pale
       expect(
         contrastRatio(get(light, '--nav-active-foreground'), get(light, '--nav-active')),
       ).toBeGreaterThanOrEqual(4.5)
+    })
+
+    it('--brand-ink passes AA (>= 4.5:1) against --background, --card, and --chrome', () => {
+      for (const surface of ['--background', '--card', '--chrome'] as const) {
+        expect(
+          contrastRatio(get(light, '--brand-ink'), get(light, surface)),
+        ).toBeGreaterThanOrEqual(4.5)
+      }
     })
   })
 
@@ -502,5 +572,42 @@ describe.each(THEMES)('Design tokens WCAG 2.2 AA contrast compliance: %s', (pale
         contrastRatio(get(dark, '--nav-active-foreground'), get(dark, '--nav-active')),
       ).toBeGreaterThanOrEqual(4.5)
     })
+
+    it('--brand-ink passes AA (>= 4.5:1) against --background, --card, and --chrome', () => {
+      for (const surface of ['--background', '--card', '--chrome'] as const) {
+        expect(contrastRatio(get(dark, '--brand-ink'), get(dark, surface))).toBeGreaterThanOrEqual(
+          4.5,
+        )
+      }
+    })
   })
+})
+
+it('gives Ocean, Moss, and Ferricade distinct --brand-ink hues in light and dark modes', () => {
+  const ferricade = extractThemeTokens('ferricade')
+  const ocean = extractThemeTokens('ocean')
+  const moss = extractThemeTokens('moss')
+  expect(
+    new Set([ferricade.light['--brand-ink'], ocean.light['--brand-ink'], moss.light['--brand-ink']])
+      .size,
+  ).toBe(3)
+  expect(
+    new Set([ferricade.dark['--brand-ink'], ocean.dark['--brand-ink'], moss.dark['--brand-ink']])
+      .size,
+  ).toBe(3)
+})
+
+it('defines primary text in each default Indigo theme block', () => {
+  const blocks = [
+    tokensRaw.match(/^:root,\s*\n\[data-theme='light'\]\s*\{([\s\S]*?)\n\}/m)?.[1],
+    tokensRaw.match(
+      /@media\s*\(prefers-color-scheme:\s*dark\)\s*\{\s*:root:not\(\[data-theme='light'\]\)\s*\{([\s\S]*?)\n\s*\}\s*\n\}/,
+    )?.[1],
+    tokensRaw.match(/^\[data-theme='dark'\]\s*\{([\s\S]*?)\n\}/m)?.[1],
+  ]
+
+  expect(blocks).toHaveLength(3)
+  for (const block of blocks) {
+    expect(block).toMatch(/--primary-text:\s*var\(--primary\);/)
+  }
 })

@@ -193,7 +193,7 @@ export function DevicePolicySection({ deviceId, className }: DevicePolicySection
               <Link
                 to="/policies"
                 search={{ edit: status.policy.id }}
-                className="text-primary underline underline-offset-4 hover:underline"
+                className="text-primary-text underline underline-offset-4 hover:underline"
               >
                 Change the policy&apos;s baseline
               </Link>{' '}
@@ -220,7 +220,7 @@ export function DevicePolicySection({ deviceId, className }: DevicePolicySection
                     id="close-disconnect"
                     checked={closeDisconnect}
                     onChange={(e) => setCloseDisconnect(e.target.checked)}
-                    className="size-4 rounded border-input text-primary focus-visible:ring-1 focus-visible:ring-ring"
+                    className="size-4 rounded border-input text-primary-text focus-visible:ring-1 focus-visible:ring-ring"
                   />
                   <label
                     htmlFor="close-disconnect"
@@ -288,7 +288,7 @@ export function DevicePolicySection({ deviceId, className }: DevicePolicySection
                     id="disconnect-on-close"
                     checked={disconnectOnClose}
                     onChange={(e) => setDisconnectOnClose(e.target.checked)}
-                    className="size-4 rounded border-input text-primary focus-visible:ring-1 focus-visible:ring-ring"
+                    className="size-4 rounded border-input text-primary-text focus-visible:ring-1 focus-visible:ring-ring"
                   />
                   <label
                     htmlFor="disconnect-on-close"

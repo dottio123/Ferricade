@@ -190,7 +190,7 @@ describe('DevicePolicySection', () => {
       const link = screen.getByRole('link', { name: "Change the policy's baseline" })
       expect(link).toHaveAttribute('href', '/policies?edit=pol-123')
       expect(link).toHaveClass('underline', 'underline-offset-4')
-      expect(link.className).not.toBe('text-primary hover:underline underline-offset-4')
+      expect(link.className).not.toBe('text-primary-text hover:underline underline-offset-4')
       expect(
         screen.getByText(
           (_, element) =>

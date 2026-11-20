@@ -170,11 +170,12 @@ describe('mock preferences storage', () => {
     const id = 'admin'
     for (const stored of [
       { ...createMockDB('small').preferencesFor(id), palette: undefined },
+      { ...createMockDB('small').preferencesFor(id), palette: 'default' },
       { ...createMockDB('small').preferencesFor(id), palette: 'neon' },
     ]) {
       const store = { getItem: () => JSON.stringify(stored), setItem: () => {} }
       expect(createMockDB('small', { preferencesStore: store }).preferencesFor(id).palette).toBe(
-        'default',
+        'ferricade',
       )
     }
   })

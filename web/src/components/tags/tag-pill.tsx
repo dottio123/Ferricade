@@ -1,4 +1,4 @@
-import { textColorFor, toCss } from '@/lib/tagColor'
+import { pageBackgroundColor, textColorFor, toCss } from '@/lib/tagColor'
 import { cn } from '@/lib/utils'
 
 export interface TagPillProps {
@@ -9,7 +9,7 @@ export interface TagPillProps {
 
 export function TagPill({ name, color, className }: TagPillProps) {
   const bg = toCss(color)
-  const fg = textColorFor(color)
+  const fg = textColorFor(color, pageBackgroundColor())
 
   return (
     <span

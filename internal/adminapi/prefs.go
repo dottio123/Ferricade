@@ -19,6 +19,8 @@ const (
 	maxPinned    = 24
 )
 
+var preferencePalettes = []string{"ferricade", "indigo", "graphite", "ocean", "violet", "moss", "sandstone"}
+
 type moduleStateJSON struct {
 	ID      string `json:"id"`
 	Enabled bool   `json:"enabled"`
@@ -107,7 +109,7 @@ func defaultPrefs() prefsJSON {
 		Modules:         normalizeModules(enabled),
 		PinnedDeviceIDs: []string{},
 		Theme:           "system",
-		Palette:         "default",
+		Palette:         "ferricade",
 		Density:         "comfortable",
 		ToastSeconds:    5,
 		toastSecondsSet: true,
@@ -151,7 +153,7 @@ func normalizeStored(p prefsJSON) prefsJSON {
 	if !slices.Contains([]string{"dark", "light", "system"}, p.Theme) {
 		p.Theme = def.Theme
 	}
-	if !slices.Contains([]string{"default", "graphite", "ocean", "violet", "moss", "sandstone"}, p.Palette) {
+	if !slices.Contains(preferencePalettes, p.Palette) {
 		p.Palette = def.Palette
 	}
 	if !slices.Contains([]string{"comfortable", "compact"}, p.Density) {
@@ -244,7 +246,7 @@ func (a *api) putPreferences(w http.ResponseWriter, r *http.Request) {
 	if len(req.Palette) != 0 {
 		var value string
 		if json.Unmarshal(req.Palette, &value) != nil {
-			bad("palette must be default, graphite, ocean, violet, moss or sandstone")
+			bad("palette must be ferricade, indigo, graphite, ocean, violet, moss or sandstone")
 			return
 		}
 		requestedPalette = &value
@@ -269,8 +271,8 @@ func (a *api) putPreferences(w http.ResponseWriter, r *http.Request) {
 	case !slices.Contains([]string{"dark", "light", "system"}, *req.Theme):
 		bad("theme must be dark, light or system")
 		return
-	case requestedPalette != nil && !slices.Contains([]string{"default", "graphite", "ocean", "violet", "moss", "sandstone"}, *requestedPalette):
-		bad("palette must be default, graphite, ocean, violet, moss or sandstone")
+	case requestedPalette != nil && !slices.Contains(preferencePalettes, *requestedPalette):
+		bad("palette must be ferricade, indigo, graphite, ocean, violet, moss or sandstone")
 		return
 	case !slices.Contains([]string{"comfortable", "compact"}, *req.Density):
 		bad("density must be comfortable or compact")
@@ -307,7 +309,7 @@ func (a *api) putPreferences(w http.ResponseWriter, r *http.Request) {
 		pins[i] = id.String()
 	}
 
-	palette := "default"
+	palette := "ferricade"
 	toastSeconds := defaultPrefs().ToastSeconds
 	if requestedPalette != nil {
 		palette = *requestedPalette

@@ -95,7 +95,7 @@ export function useThemeSwitch() {
 
   return {
     theme: currentTheme,
-    palette: preferences?.palette ?? 'default',
+    palette: preferences?.palette ?? 'ferricade',
     toastSeconds: preferences?.toast_seconds ?? 5,
     density: preferences?.density ?? 'comfortable',
     setTheme,

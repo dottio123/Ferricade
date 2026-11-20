@@ -12,7 +12,8 @@ export type Theme = Preferences['theme']
 export type Palette = Preferences['palette']
 export type Density = Preferences['density']
 export const PALETTES: readonly Palette[] = [
-  'default',
+  'ferricade',
+  'indigo',
   'graphite',
   'ocean',
   'violet',
@@ -30,7 +31,7 @@ export const APPEARANCE_KEY = 'ferricade-appearance'
 /** The server's defaults for a user who never chose (internal/adminapi/prefs.go). */
 export const DEFAULT_APPEARANCE: Appearance = {
   theme: 'system',
-  palette: 'default',
+  palette: 'ferricade',
   density: 'comfortable',
 }
 
@@ -56,7 +57,8 @@ export function useResolvedMode(theme: Theme): ResolvedMode {
 }
 
 export const THEME_COLORS: Record<Palette, Record<ResolvedMode, string>> = {
-  default: { light: '#4338ca', dark: '#0f1322' },
+  ferricade: { light: '#F0EEEB', dark: '#181A1D' },
+  indigo: { light: '#4338ca', dark: '#0f1322' },
   graphite: { light: '#18181b', dark: '#111114' },
   ocean: { light: '#0369a1', dark: '#0a1724' },
   violet: { light: '#6d28d9', dark: '#140f24' },
@@ -74,22 +76,9 @@ let systemListener: ((e: MediaQueryListEvent | { matches: boolean }) => void) | 
 export function applyAppearance(appearance: Appearance, root = document.documentElement): void {
   if (appearance.theme === 'system') root.removeAttribute('data-theme')
   else root.dataset.theme = appearance.theme
-  if (appearance.palette === 'default') root.removeAttribute('data-palette')
+  if (appearance.palette === 'indigo') root.removeAttribute('data-palette')
   else root.dataset.palette = appearance.palette
   root.dataset.density = appearance.density
-
-  const icon =
-    typeof document !== 'undefined'
-      ? document.querySelector<HTMLLinkElement>('link[rel="icon"]')
-      : null
-  if (icon) {
-    icon.setAttribute(
-      'href',
-      appearance.palette === 'default'
-        ? '/icons/icon.svg'
-        : `/icons/icon-${appearance.palette}.svg`,
-    )
-  }
 
   if (systemMediaQuery && systemListener) {
     if (typeof systemMediaQuery.removeEventListener === 'function') {
@@ -114,7 +103,7 @@ export function applyAppearance(appearance: Appearance, root = document.document
   const applyThemeColor = (isDark: boolean) => {
     if (!metaTheme) return
     const mode: ResolvedMode = isDark ? 'dark' : 'light'
-    const colors = THEME_COLORS[appearance.palette] ?? THEME_COLORS.default
+    const colors = THEME_COLORS[appearance.palette] ?? THEME_COLORS.ferricade
     metaTheme.setAttribute('content', colors[mode])
   }
 
@@ -160,7 +149,12 @@ export function readCachedAppearance(): Appearance {
   const c = (typeof cached === 'object' && cached !== null ? cached : {}) as Record<string, unknown>
   return {
     theme: THEMES.includes(c.theme as Theme) ? (c.theme as Theme) : DEFAULT_APPEARANCE.theme,
-    palette: PALETTES.includes(c.palette as Palette) ? (c.palette as Palette) : 'default',
+    palette:
+      c.palette === 'default'
+        ? 'ferricade'
+        : PALETTES.includes(c.palette as Palette)
+          ? (c.palette as Palette)
+          : 'ferricade',
     density: DENSITIES.includes(c.density as Density)
       ? (c.density as Density)
       : DEFAULT_APPEARANCE.density,

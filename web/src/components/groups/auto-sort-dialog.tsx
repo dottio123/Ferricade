@@ -97,7 +97,7 @@ function AutoSortDialogContent({ onClose }: { onClose: () => void }) {
         {/* If the run already completed, show summary result */}
         {runResult !== null ? (
           <div className="flex flex-col gap-3 py-4">
-            <div className="flex items-center gap-2 text-primary font-medium text-sm">
+            <div className="flex items-center gap-2 text-primary-text font-medium text-sm">
               <CheckCircle2Icon className="size-5 shrink-0" />
               <span>Auto sort complete</span>
             </div>
@@ -195,7 +195,7 @@ function AutoSortDialogContent({ onClose }: { onClose: () => void }) {
                     type="checkbox"
                     checked={understood}
                     onChange={(e) => setUnderstood(e.target.checked)}
-                    className="mt-0.5 size-4 rounded-xs border-border text-primary accent-primary cursor-pointer shrink-0"
+                    className="mt-0.5 size-4 rounded-xs border-border text-primary-text accent-primary cursor-pointer shrink-0"
                   />
                   <span className="text-2xs font-medium text-foreground leading-snug">
                     I understand these devices will move and may get a different client policy

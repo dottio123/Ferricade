@@ -169,7 +169,7 @@ function FullAuditTimeline({ events, resolveActor, isOwner, users = [] }: AuditT
                         {' '}
                         <DeviceLink
                           deviceId={targetDeviceId}
-                          className="font-medium text-foreground underline decoration-border/60 hover:text-primary"
+                          className="font-medium text-foreground underline decoration-border/60 hover:text-primary-text"
                         >
                           {deviceName}
                         </DeviceLink>
@@ -180,7 +180,7 @@ function FullAuditTimeline({ events, resolveActor, isOwner, users = [] }: AuditT
                         {' '}
                         <Link
                           to="/groups"
-                          className="font-medium text-foreground underline decoration-border/60 hover:text-primary"
+                          className="font-medium text-foreground underline decoration-border/60 hover:text-primary-text"
                         >
                           {targetLabel}
                         </Link>
@@ -191,7 +191,7 @@ function FullAuditTimeline({ events, resolveActor, isOwner, users = [] }: AuditT
                         {' '}
                         <Link
                           to="/tags"
-                          className="font-medium text-foreground underline decoration-border/60 hover:text-primary"
+                          className="font-medium text-foreground underline decoration-border/60 hover:text-primary-text"
                         >
                           {targetLabel}
                         </Link>
@@ -204,7 +204,7 @@ function FullAuditTimeline({ events, resolveActor, isOwner, users = [] }: AuditT
                           {' '}
                           <Link
                             to="/settings/users"
-                            className="font-medium text-foreground underline decoration-border/60 hover:text-primary"
+                            className="font-medium text-foreground underline decoration-border/60 hover:text-primary-text"
                           >
                             {targetLabel}
                           </Link>

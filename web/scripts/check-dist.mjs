@@ -44,7 +44,7 @@ for (const name of walk(dist)) {
   if (DEV_ONLY_MARKER.test(text)) problems.push(`${name} contains a dev-only page (data-dev-only)`)
 }
 
-for (const required of ['manifest.json', 'sw.js']) {
+for (const required of ['manifest.json', 'sw.js', 'favicon.svg', 'favicon.ico']) {
   try {
     readFileSync(join(dist, required))
   } catch {

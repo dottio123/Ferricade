@@ -272,7 +272,7 @@ function GroupConflictDialogContent({
                     value={group.id}
                     checked={isSelected}
                     onChange={() => setUserChoice(group.id)}
-                    className="size-4 text-primary accent-primary cursor-pointer shrink-0"
+                    className="size-4 text-primary-text accent-primary cursor-pointer shrink-0"
                   />
                   <div className="flex flex-col min-w-0">
                     <span className="text-sm font-medium text-foreground truncate">
@@ -302,7 +302,7 @@ function GroupConflictDialogContent({
                 value="keep"
                 checked={selectedChoice === 'keep'}
                 onChange={() => setUserChoice('keep')}
-                className="size-4 text-primary accent-primary cursor-pointer shrink-0"
+                className="size-4 text-primary-text accent-primary cursor-pointer shrink-0"
               />
               <div className="flex flex-col min-w-0">
                 <span className="text-sm font-medium text-foreground">Keep where it is</span>

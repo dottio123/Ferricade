@@ -623,7 +623,7 @@ export function GroupsView() {
                 <Link
                   to="/devices"
                   search={{ group: 'ungrouped' }}
-                  className="text-sm font-medium text-muted-foreground hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                  className="text-sm font-medium text-muted-foreground hover:text-primary-text focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
                 >
                   Ungrouped devices
                 </Link>

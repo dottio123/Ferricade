@@ -22,21 +22,41 @@ export function toCss(argb: number): string {
  * Calculates a readable text color ('black' or 'white') to contrast
  * against the provided ARGB background color using WCAG relative luminance.
  */
-export function textColorFor(argb: number): 'black' | 'white' {
+export function textColorFor(argb: number, background = 0xffffffff): 'black' | 'white' {
+  return textColorForOn(argb, background)
+}
+
+/** Returns the resolved page background as an opaque ARGB color. */
+export function pageBackgroundColor(): number {
+  const background =
+    typeof document === 'undefined'
+      ? ''
+      : getComputedStyle(document.documentElement).getPropertyValue('--background').trim()
+  return background ? fromCss(background) : 0xffffffff
+}
+
+/** Chooses the better contrasting text color after alpha-compositing the tag. */
+function textColorForOn(argb: number, background: number): 'black' | 'white' {
   const u32 = argb >>> 0
+  const ground = background >>> 0
+  const alpha = ((u32 >>> 24) & 0xff) / 255
   const r = (u32 >>> 16) & 0xff
   const g = (u32 >>> 8) & 0xff
   const b = u32 & 0xff
+  const shownR = r * alpha + ((ground >>> 16) & 0xff) * (1 - alpha)
+  const shownG = g * alpha + ((ground >>> 8) & 0xff) * (1 - alpha)
+  const shownB = b * alpha + (ground & 0xff) * (1 - alpha)
 
   const toLinear = (c: number) => {
     const normalized = c / 255
     return normalized <= 0.04045 ? normalized / 12.92 : Math.pow((normalized + 0.055) / 1.055, 2.4)
   }
 
-  const lum = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b)
+  const lum = 0.2126 * toLinear(shownR) + 0.7152 * toLinear(shownG) + 0.0722 * toLinear(shownB)
+  const blackContrast = (lum + 0.05) / 0.05
+  const whiteContrast = 1.05 / (lum + 0.05)
 
-  // Standard WCAG luminance cutoff: 0.179 gives ~4.5:1 against black/white
-  return lum > 0.179 ? 'black' : 'white'
+  return blackContrast >= whiteContrast ? 'black' : 'white'
 }
 
 /**

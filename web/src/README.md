@@ -151,8 +151,8 @@ The tokens key off two attributes on `<html>`: `data-theme` (`dark` or
   serves the next first paint.
 - `public/theme.js` (loaded by `index.html` before the app) applies the cache,
   so there is no flash. Do not move it inline: the CSP blocks inline scripts.
-- These two files are the only code allowed to use `localStorage` outside the
-  API client and the live stream (`eslint.config.js`).
+- Appearance and sidebar pin state are the only UI data allowed in
+  `localStorage` outside the API client and live stream (`eslint.config.js`).
 
 ## CSP and runtime styles (`lib/cspNonce.ts`)
 

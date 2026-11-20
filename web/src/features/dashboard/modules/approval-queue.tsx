@@ -112,7 +112,7 @@ export function ApprovalQueueModule({
           <Link
             to="/devices/queue"
             aria-label="View approval queue"
-            className="text-xs font-medium text-primary hover:underline"
+            className="text-xs font-medium text-primary-text hover:underline"
           >
             View all
           </Link>

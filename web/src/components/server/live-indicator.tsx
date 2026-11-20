@@ -180,7 +180,7 @@ export function LiveIndicator() {
               </Button>
               <Link
                 to="/settings/server"
-                className="text-xs text-primary underline-offset-4 hover:underline"
+                className="text-xs text-primary-text underline-offset-4 hover:underline"
               >
                 Server settings
               </Link>

@@ -68,7 +68,10 @@ test.describe('desktop sidebar fits the viewport', () => {
     await page.setViewportSize({ width: 1280, height: 480 })
     await page.goto('/devices?mock=large')
     await expect(page.getByRole('heading', { level: 1, name: 'Devices' })).toBeVisible()
-    await page.getByRole('button', { name: 'Collapse sidebar' }).click()
+    await page.getByRole('button', { name: 'Unpin sidebar' }).click()
+    await page.mouse.move(500, 500)
+    await page.evaluate(() => (document.activeElement as HTMLElement).blur())
+    await expect(page.getByRole('button', { name: 'Pin sidebar' })).toBeHidden()
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
     expect((await page.locator('aside').boundingBox())?.y).toBe(0)
 

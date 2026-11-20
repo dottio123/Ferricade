@@ -127,9 +127,31 @@ describe('the appearance cache (B1)', () => {
     )
   })
 
+  it('lets the app shell remember its non-sensitive sidebar mode only', async () => {
+    expect(await rules('src/routes/_app.tsx', STORAGE)).toEqual([])
+    expect(await rules('src/routes/_app.tsx', "void fetch('/x')\n")).toContain(
+      'no-restricted-globals',
+    )
+    expect(await rules('src/routes/_app.tsx', 'void sessionStorage.length\n')).toContain(
+      'no-restricted-globals',
+    )
+  })
+
   it('lints public/theme.js as a browser script that may read storage but not the network', async () => {
     expect(await rules('public/theme.js', STORAGE)).toEqual([])
     expect(await rules('public/theme.js', "void fetch('/x')\n")).toContain('no-restricted-globals')
+  })
+
+  it('lets src/auth/intro-flag.ts use sessionStorage only, and nothing else of the list', async () => {
+    expect(
+      await rules('src/auth/intro-flag.ts', "void window.sessionStorage.getItem('x')\n"),
+    ).toEqual([])
+    expect(await rules('src/auth/intro-flag.ts', "void localStorage.getItem('x')\n")).toContain(
+      'no-restricted-globals',
+    )
+    expect(await rules('src/auth/intro-flag.ts', "void fetch('/x')\n")).toContain(
+      'no-restricted-globals',
+    )
   })
 })
 

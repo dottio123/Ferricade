@@ -58,18 +58,26 @@ describe('Appearance settings', () => {
     expect(await findByRole('status', { name: 'Loading appearance settings' })).toBeInTheDocument()
   })
 
-  it('shows the ordered palettes with Default selected for a new user', async () => {
+  it('shows the ordered palettes with Ferricade selected for a new user', async () => {
     renderAppearance()
     expect(await findByRole('heading', { level: 1, name: 'Appearance' })).toBeInTheDocument()
     const radios = await findAllByRole('radio', {
-      name: /Default|Graphite|Ocean|Violet|Moss|Sandstone/,
+      name: /Ferricade|Indigo|Graphite|Ocean|Violet|Moss|Sandstone/,
     })
     expect(
       radios
         .filter((radio) => (radio as HTMLInputElement).name === 'palette')
         .map((radio) => radio.getAttribute('value')),
-    ).toEqual(['default', 'graphite', 'ocean', 'violet', 'moss', 'sandstone'])
-    expect(screen.getByRole('radio', { name: 'Default' })).toBeChecked()
+    ).toEqual(['ferricade', 'indigo', 'graphite', 'ocean', 'violet', 'moss', 'sandstone'])
+    expect(screen.getByRole('radio', { name: 'Ferricade' })).toBeChecked()
+    const miniWordmarks = document.querySelectorAll(
+      '[aria-hidden="true"][data-theme] [data-brand-logo="wordmark"]',
+    )
+    expect(miniWordmarks).toHaveLength(7)
+    for (const logo of miniWordmarks) {
+      expect(logo).toHaveAttribute('data-brand-variant', 'flat')
+      expect(logo).toHaveAttribute('aria-hidden', 'true')
+    }
   })
 
   it('applies and saves Ocean', async () => {
@@ -81,14 +89,14 @@ describe('Appearance settings', () => {
     expect(document.documentElement.dataset.palette).toBe('ocean')
   })
 
-  it('restores Default and shows an error when saving fails', async () => {
+  it('restores Ferricade and shows an error when saving fails', async () => {
     renderAppearance('?mock-fail=putPreferences')
     fireEvent.click(await findByRole('radio', { name: 'Violet' }))
     expect(await findByRole('alert')).toBeInTheDocument()
-    await waitFor(() => expect(screen.getByRole('radio', { name: 'Default' })).toBeChecked(), {
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Ferricade' })).toBeChecked(), {
       timeout: 5_000,
     })
-    expect(document.documentElement.hasAttribute('data-palette')).toBe(false)
+    expect(document.documentElement.dataset.palette).toBe('ferricade')
   })
 
   it('reflects the stored mode', async () => {

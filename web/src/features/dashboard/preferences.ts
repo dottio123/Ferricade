@@ -30,7 +30,7 @@ export function reconcilePreferences(
       modules: [],
       pinned_device_ids: stored?.pinned_device_ids ?? [],
       theme: stored?.theme ?? 'system',
-      palette: stored?.palette ?? 'default',
+      palette: stored?.palette ?? 'ferricade',
       density: stored?.density ?? 'comfortable',
       toast_seconds: stored?.toast_seconds ?? 5,
     }
@@ -73,7 +73,7 @@ export function reconcilePreferences(
       ? stored.pinned_device_ids.slice(0, PIN_LIMIT)
       : [],
     theme: stored.theme ?? 'system',
-    palette: stored.palette ?? 'default',
+    palette: stored.palette ?? 'ferricade',
     density: stored.density ?? 'comfortable',
     toast_seconds: stored.toast_seconds ?? 5,
   }

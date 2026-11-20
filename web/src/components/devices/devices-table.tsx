@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { textColorFor, toCss } from '@/lib/tagColor'
+import { pageBackgroundColor, textColorFor, toCss } from '@/lib/tagColor'
 import { cn } from '@/lib/utils'
 
 export type Device = components['schemas']['Device']
@@ -162,7 +162,7 @@ export function DevicesTable({
                               aria-label={`Select device ${name}`}
                               checked={isSelected}
                               onChange={() => onToggleSelect(device.id)}
-                              className="size-4 rounded border-input text-primary focus:ring-ring cursor-pointer"
+                              className="size-4 rounded border-input text-primary-text focus:ring-ring cursor-pointer"
                             />
                           </div>
                         )}
@@ -289,7 +289,7 @@ export function DevicesTable({
                         if (el) el.indeterminate = someSelected
                       }}
                       onChange={onToggleSelectAll}
-                      className="size-4 rounded border-input text-primary focus:ring-ring cursor-pointer align-middle"
+                      className="size-4 rounded border-input text-primary-text focus:ring-ring cursor-pointer align-middle"
                     />
                   </TableHead>
                 )}
@@ -367,7 +367,7 @@ export function DevicesTable({
                               aria-label={`Select device ${name}`}
                               checked={isSelected}
                               onChange={() => onToggleSelect(device.id)}
-                              className="size-4 rounded border-input text-primary focus:ring-ring cursor-pointer align-middle"
+                              className="size-4 rounded border-input text-primary-text focus:ring-ring cursor-pointer align-middle"
                             />
                           </TableCell>
                         )}
@@ -480,11 +480,12 @@ export function DevicesTable({
                             ) : (
                               device.tags.map((t) => (
                                 <span
+                                  data-slot="tag-label"
                                   key={t.id}
                                   className="inline-flex items-center px-1.5 py-0.5 rounded text-2xs font-medium"
                                   style={{
                                     backgroundColor: toCss(t.color),
-                                    color: textColorFor(t.color),
+                                    color: textColorFor(t.color, pageBackgroundColor()),
                                   }}
                                 >
                                   {t.name}
