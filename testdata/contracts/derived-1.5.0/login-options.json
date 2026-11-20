@@ -1,0 +1,10 @@
+{
+  "source": "derived",
+  "client_version": "1.5.0",
+  "ref": "flutter/lib/models/user_model.dart queryOidcLoginOptions",
+  "method": "GET",
+  "path": "/api/login-options",
+  "response": [
+    "oidc/authentik"
+  ]
+}

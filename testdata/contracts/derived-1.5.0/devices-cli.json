@@ -1,0 +1,17 @@
+{
+  "source": "derived",
+  "client_version": "1.5.0",
+  "ref": "src/core_main.rs --assign",
+  "method": "POST",
+  "path": "/api/devices/cli",
+  "headers": {
+    "Authorization": "Bearer [redacted]"
+  },
+  "body": {
+    "id": "123456789",
+    "uuid": "ZmFrZS11dWlk",
+    "device_group_name": "Ops",
+    "note": "front desk"
+  },
+  "response_text": ""
+}

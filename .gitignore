@@ -1,0 +1,24 @@
+/bin/
+/ferricade
+/rdsim
+/.superpowers/
+# Hand-off files between Claude, Gemini and the user (plans, reports, reviews).
+/.reports/
+/deploy/lab/captures/
+/deploy/lab/data/
+/deploy/.env
+/deploy/logs/
+/web/dist/*
+!/web/dist/.gitkeep
+/web/node_modules/
+/web/dist-mock/
+/web/shots/
+/web/test-results/
+/web/playwright-report/
+/web/test-results-live/
+/web/playwright-report-live/
+/web/.env*
+!/web/.env.example
+
+# Impeccable critique snapshots (working files, like .reports/).
+/.impeccable/critique/

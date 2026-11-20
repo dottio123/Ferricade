@@ -1,0 +1,26 @@
+issuer: http://dex:5556/dex
+storage:
+  type: memory
+web:
+  http: 0.0.0.0:5556
+oauth2:
+  skipApprovalScreen: true
+staticClients:
+  - id: ferricade
+    name: Ferricade
+    secret: ferricade-e2e-secret
+    redirectURIs:
+      - http://localhost:21220/admin/api/v1/auth/oidc/callback
+connectors:
+  - type: mockCallback
+    id: mock
+    name: Mock
+    config:
+      user:
+        id: kilgore
+        email: kilgore@kilgore.trout
+        emailVerified: true
+        username: kilgore
+        preferredUsername: kilgore
+        groups:
+          - authors

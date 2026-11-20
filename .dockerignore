@@ -1,0 +1,22 @@
+.git
+.superpowers
+bin
+deploy/.env
+# Volume directories: lab captures and hbbs/hbbr data, which holds the
+# server's private key.
+deploy/lab/captures
+deploy/lab/data
+deploy/data
+deploy/**/data
+**/id_ed25519
+**/id_ed25519.pub
+# The web UI is built inside the image (Dockerfile, stage "web"); never send
+# the host's dependencies, build output, test output or local env files.
+web/node_modules
+web/dist
+web/dist-mock
+web/.env*
+web/.tanstack
+web/test-results
+web/playwright-report
+web/shots

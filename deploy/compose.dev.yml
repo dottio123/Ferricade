@@ -1,0 +1,72 @@
+# Development and LAN tests only; this builds from source and may allow HTTP.
+# POSTGRES_PASSWORD defaults to ferricade here only. Never use this file for production.
+name: ferricade-dev
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ferricade
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ferricade}
+      POSTGRES_DB: ferricade
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ferricade -d ferricade"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    logging: &logging
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  app:
+    build: ../
+    command: ["serve"]
+    volumes:
+      - ./logs:/var/log/ferricade
+    ports:
+      - "${FERRICADE_CLIENT_PORT:-21114}:21114"
+      - "${ADMIN_BIND:-127.0.0.1}:${FERRICADE_ADMIN_PORT:-21120}:21120"
+    environment:
+      DATABASE_URL: postgres://ferricade:${POSTGRES_PASSWORD:-ferricade}@db:5432/ferricade?sslmode=disable
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY to base64 of at least 32 random bytes}
+      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL to the admin console URL}
+      DEV_INSECURE: ${DEV_INSECURE:-}
+      HBBS_ADDR: ${HBBS_ADDR:-}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      MAX_PENDING_DEVICES: ${MAX_PENDING_DEVICES:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *logging
+
+  hbbs:
+    profiles: [rustdesk]
+    image: rustdesk/rustdesk-server:1.1.16
+    command: hbbs -r ${RELAY_HOST:?set RELAY_HOST to the address clients reach hbbr at}:21117 -k _
+    ports:
+      - "21115:21115"
+      - "21116:21116"
+      - "21116:21116/udp"
+    volumes:
+      - rustdesk-data:/root
+    restart: unless-stopped
+    logging: *logging
+
+  hbbr:
+    profiles: [rustdesk]
+    image: rustdesk/rustdesk-server:1.1.16
+    command: hbbr -k _
+    ports:
+      - "21117:21117"
+    volumes:
+      - rustdesk-data:/root
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  db-data:
+  rustdesk-data:

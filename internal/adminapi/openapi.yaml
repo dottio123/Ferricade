@@ -1,0 +1,3220 @@
+openapi: 3.1.0
+info:
+  title: ferricade admin API
+  version: 1.0.0
+  description: |
+    The admin console's JSON API (/admin/api/v1) and first-run setup wizard (/setup).
+
+    Every response carries Strict-Transport-Security (except in DEV_INSECURE mode),
+    Content-Security-Policy, X-Content-Type-Options, Referrer-Policy,
+    Cross-Origin-Opener-Policy and X-Request-ID; API responses also carry
+    Cache-Control: no-store.
+
+    Every request other than GET or HEAD must send an Origin header (or, without one,
+    a Referer) with PUBLIC_URL's origin, else 403 "csrf". With a session it must also
+    send X-CSRF-Token equal to the session's token (from /auth/login, /auth/totp,
+    /auth/totp/enroll/verify, /auth/password or /auth/me), else 403 "csrf".
+    /auth/login needs only the origin check.
+
+    Endpoints other than /auth/* need the session to have passed TOTP when the user
+    has TOTP enrolled (else 403 "mfa_required"); a user who must enroll TOTP but has
+    not gets 403 "totp_enroll_required" everywhere but /auth/me, /auth/logout,
+    /auth/totp/enroll and /auth/totp/enroll/verify.
+
+    Setup routes need X-Setup-Token (the token the server logs at startup, valid 24 h)
+    and exist only until setup completes; afterwards every /setup path except
+    GET /setup/status is 404.
+
+    Errors are {"error":{"code","message"}}, plus "request_id" for "internal".
+
+    Lists return {items, next_cursor} and take ?limit= (default 50; at most 200 are
+    returned) and ?cursor= (the previous page's next_cursor, which is "" on the last
+    page). A malformed limit or cursor gives 400 "bad_request".
+
+    Authorization, by role:
+    - Owner: every endpoint.
+    - Admin: every endpoint except /users/*, /settings/oidc*, PATCH /server,
+      PUT /settings/dashboard, PUT /deployment/profile, PUT /settings/log-export
+      and POST /settings/log-export/test, POST /devices/auto-sort/preview,
+      and POST /devices/auto-sort, which give 403 "forbidden".
+    - User: only GET /auth/me, POST /auth/logout, POST /auth/password, the /auth/totp*
+      endpoints, GET and PUT /me/preferences, GET /users/{id}/avatar (their own photo
+      only), GET /events, GET /devices, GET /devices/{id}, GET /devices/{id}/connect,
+      GET /sessions, GET /sessions/stats, GET /audit, GET /stats/summary, GET /stats/fleet-map, GET /server/health,
+      GET /dashboard/catalog, GET /settings/dashboard, GET /groups and GET /tags. Every
+      other endpoint gives a User 403 "forbidden". These answer only about the devices
+      granted to the User (PUT /users/{id}/grants): approved devices that are granted
+      directly or sit in a granted group or any of its subgroups. A device, session,
+      group or user photo outside that answers 404 "not_found", exactly as a missing one.
+    Every state-changing request is written to the audit log in the same transaction.
+servers:
+  - url: /
+
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: __Host-ferricade_session
+      description: Session cookie (named ferricade_session in DEV_INSECURE mode).
+    csrf:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+    setupToken:
+      type: apiKey
+      in: header
+      name: X-Setup-Token
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+              enum:
+                - bad_request
+                - validation_error
+                - weak_password
+                - invalid_key
+                - invalid_code
+                - code_already_used
+                - unauthenticated
+                - csrf
+                - mfa_required
+                - totp_enroll_required
+                - forbidden
+                - reauthentication_required
+                - not_found
+                - incomplete
+                - bad_transition
+                - session_ended
+                - last_owner
+                - no_password
+                - cycle
+                - not_empty
+                - username_taken
+                - name_taken
+                - pattern_taken
+                - in_use
+                - default_policy
+                - window_open
+                - push_off
+                - always_reachable
+                - access_locked
+                - locked
+                - rate_limited
+                - internal
+                - busy
+            message:
+              type: string
+            request_id:
+              type: string
+              description: Present for "internal"; matches the X-Request-ID header and the server log.
+    User:
+      type: object
+      required: [id, username, display_name, email, role, status, totp_required, sso, avatar_url]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        username: {type: string}
+        display_name: {type: string}
+        email: {type: string}
+        role: {type: string, enum: [owner, admin, user]}
+        status: {type: string, enum: [active, disabled]}
+        totp_required: {type: boolean}
+        sso: {type: boolean, description: True when the account is linked to the OIDC provider.}
+        avatar_url:
+          type: [string, 'null']
+          description: >-
+            Path of the user's photo (GET /users/{id}/avatar?v=<version>), or null when there is
+            none.
+    UserRef:
+      type: object
+      required: [id, display_name]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        display_name: {type: string}
+    PolicySettings:
+      type: object
+      description: Catalog keys of GET /deployment/profile's catalog mapped to one of that setting's values (Y/N for bool settings); approve-mode and verification-method are required.
+      additionalProperties: {type: string}
+    Policy:
+      type: object
+      required: [id, name, is_default, settings, updated_at, updated_by]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        is_default: {type: boolean}
+        settings: {$ref: '#/components/schemas/PolicySettings'}
+        updated_at: {type: string, format: date-time}
+        updated_by:
+          oneOf:
+            - {$ref: '#/components/schemas/UserRef'}
+            - {type: 'null'}
+    SessionSettings:
+      type: object
+      required: [lifetime, updated_at, updated_by]
+      additionalProperties: false
+      properties:
+        lifetime:
+          type: string
+          enum: [browser, 8h, 1d, 7d, 30d]
+          description: How long a sign-in lasts. browser = until the browser closes (5 minutes without an open console tab), at most 7 days.
+        updated_at: {type: [string, 'null'], format: date-time, description: Null until first changed.}
+        updated_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+    PolicyPush:
+      type: object
+      required: [enabled, updated_at, updated_by]
+      additionalProperties: false
+      properties:
+        enabled: {type: boolean}
+        updated_at: {type: string, format: date-time}
+        updated_by:
+          oneOf:
+            - {$ref: '#/components/schemas/UserRef'}
+            - {type: 'null'}
+    LogExportSettings:
+      type: object
+      required: [file, syslog]
+      additionalProperties: false
+      properties:
+        file:
+          type: object
+          required: [enabled]
+          additionalProperties: false
+          properties:
+            enabled: {type: boolean}
+        syslog:
+          type: object
+          required: [enabled, host, port, tls, ca_pem, facility, format]
+          additionalProperties: false
+          properties:
+            enabled: {type: boolean}
+            host: {type: string, maxLength: 253, description: Host name or IP address of the collector; may be empty only while off.}
+            port: {type: integer, minimum: 1, maximum: 65535, description: 6514 is usual with TLS, 514 without.}
+            tls: {type: boolean, description: TLS 1.2 or later; the collector's host name is verified.}
+            ca_pem: {type: string, maxLength: 32768, description: Extra CA certificates (PEM) trusted besides the system roots; empty for none.}
+            facility: {type: string, enum: [kern, user, mail, daemon, auth, syslog, lpr, news, uucp, cron, authpriv, ftp, local0, local1, local2, local3, local4, local5, local6, local7]}
+            format: {type: string, enum: [json, text], description: json sends the whole event; text sends key=value pairs followed by an escaped and quoted msg sentence.}
+    LogExportOutputStatus:
+      type: object
+      required: [pending, last_delivered_at, last_error, last_error_at]
+      additionalProperties: false
+      properties:
+        pending: {type: integer, minimum: 0, description: Events waiting for this output; 0 while it is off.}
+        last_delivered_at: {type: [string, 'null'], format: date-time, description: Null until the first delivery since the server started.}
+        last_error: {type: [string, 'null'], maxLength: 1024, description: The last delivery error; cleared by the next successful delivery.}
+        last_error_at: {type: [string, 'null'], format: date-time}
+    LogExport:
+      type: object
+      required: [settings, status, updated_at, updated_by]
+      additionalProperties: false
+      properties:
+        settings: {$ref: '#/components/schemas/LogExportSettings'}
+        status:
+          type: object
+          required: [file, syslog]
+          additionalProperties: false
+          properties:
+            file: {$ref: '#/components/schemas/LogExportOutputStatus'}
+            syslog: {$ref: '#/components/schemas/LogExportOutputStatus'}
+        updated_at: {type: string, format: date-time}
+        updated_by:
+          oneOf:
+            - {$ref: '#/components/schemas/UserRef'}
+            - {type: 'null'}
+    LogExportTestResult:
+      type: object
+      required: [ok, error]
+      additionalProperties: false
+      properties:
+        ok: {type: boolean}
+        error: {type: [string, 'null'], maxLength: 1024, description: Null when ok.}
+    AccessWindow:
+      type: object
+      required: [id, opened_by, opened_at, ends_at, disconnect_on_close]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        opened_by:
+          description: null for a User, who cannot see who opened the window.
+          oneOf:
+            - {$ref: '#/components/schemas/UserRef'}
+            - {type: 'null'}
+        opened_at: {type: string, format: date-time}
+        ends_at: {type: [string, 'null'], format: date-time}
+        disconnect_on_close: {type: boolean}
+    DevicePolicyStatus:
+      type: object
+      required: [push_enabled, policy, source, source_group, effective_settings, status, connect, always_reachable, window, close_unconfirmed_since]
+      additionalProperties: false
+      properties:
+        push_enabled: {type: boolean}
+        policy:
+          type: object
+          required: [id, name]
+          additionalProperties: false
+          properties:
+            id: {type: string, format: uuid}
+            name: {type: string}
+        source: {type: string, enum: [group, parent_group, default]}
+        source_group:
+          description: null for a User when the source group is outside their visible groups.
+          oneOf:
+            - type: object
+              required: [id, name]
+              additionalProperties: false
+              properties:
+                id: {type: string, format: uuid}
+                name: {type: string}
+            - {type: 'null'}
+        effective_settings: {$ref: '#/components/schemas/PolicySettings'}
+        status: {type: string, enum: [applied, pending, off]}
+        connect:
+          type: string
+          enum: [unrestricted, window, attended, locked]
+          description: |
+            unrestricted: Policy does not restrict Connect.
+            window: An open, unexpired access window allows Connect.
+            attended: Someone at the device can accept.
+            locked: Policy refuses password-only access.
+        always_reachable: {type: boolean}
+        window:
+          oneOf:
+            - {$ref: '#/components/schemas/AccessWindow'}
+            - {type: 'null'}
+        close_unconfirmed_since:
+          type: [string, 'null']
+          format: date-time
+          description: A closed window the device has not confirmed; until it does, it may still accept password logins.
+    UserGrants:
+      type: object
+      required: [group_ids, device_ids]
+      additionalProperties: false
+      properties:
+        group_ids:
+          type: array
+          maxItems: 256
+          uniqueItems: true
+          items: {type: string, format: uuid}
+          description: Granted groups; each covers its subgroups and their devices.
+        device_ids:
+          type: array
+          maxItems: 256
+          uniqueItems: true
+          items: {type: string, format: uuid}
+          description: Devices granted one by one.
+    CSRFToken:
+      type: object
+      required: [csrf_token]
+      additionalProperties: false
+      properties:
+        csrf_token:
+          type: string
+          description: The session's new CSRF token; the session was rotated, so the previous token no longer works.
+    Code:
+      type: object
+      required: [code]
+      additionalProperties: false
+      properties:
+        code: {type: string, pattern: '^[0-9]{6}$'}
+    TOTPEnrollRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        current_password: {type: string, description: Required to re-enroll TOTP for an account with a password.}
+    TOTPSecret:
+      type: object
+      required: [secret, otpauth_url]
+      additionalProperties: false
+      properties:
+        secret: {type: string, description: 'Base32, no padding.'}
+        otpauth_url: {type: string, description: 'otpauth://totp/ferricade:<username>?secret=...&issuer=ferricade'}
+    Tag:
+      type: object
+      required: [id, name, color]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string, description: 'Unique, compared case-insensitively.'}
+        color: {type: integer, format: int64, minimum: 0, maximum: 4294967295, description: 'ARGB as an unsigned 32-bit value, e.g. 4280391411 (0xFF2196F3).'}
+    Alert:
+      type: object
+      required: [id, kind, seen_uuid, ip, created_at, window_closed_at, groups]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [uuid_mismatch, access_window_unconfirmed, group_conflict]}
+        seen_uuid: {type: [string, 'null'], description: The uuid the client sent, which differs from the pinned one.}
+        ip: {type: [string, 'null'], description: The address the mismatching request came from.}
+        created_at: {type: string, format: date-time}
+        window_closed_at: {type: [string, 'null'], format: date-time}
+        groups: {type: array, items: {$ref: '#/components/schemas/GroupRef'}, description: 'group_conflict: the matching groups that still exist; empty for other kinds.'}
+    Device:
+      type: object
+      required: [id, rustdesk_id, uuid, state, alias, hostname, os, cpu, memory, client_version, username, note,
+                 group_id, first_seen_at, last_seen_at, approved_by, approved_at, updated_at, tags, open_alerts,
+                 online, conns]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        rustdesk_id: {type: string}
+        uuid: {type: string, description: The client uuid the device is pinned to.}
+        state: {type: string, enum: [pending, approved, rejected, archived]}
+        alias: {type: string}
+        hostname: {type: string}
+        os: {type: string}
+        cpu: {type: string}
+        memory: {type: string}
+        client_version: {type: string}
+        username: {type: string}
+        note: {type: string}
+        group_id: {type: [string, 'null'], format: uuid}
+        first_seen_at: {type: string, format: date-time}
+        last_seen_at: {type: string, format: date-time, description: Last heartbeat as stored; written every 30 s.}
+        approved_by: {type: [string, 'null'], format: uuid}
+        approved_at: {type: [string, 'null'], format: date-time}
+        updated_at: {type: string, format: date-time}
+        tags:
+          type: array
+          items: {$ref: '#/components/schemas/Tag'}
+        open_alerts:
+          type: array
+          items: {$ref: '#/components/schemas/Alert'}
+        online: {type: boolean, description: 'A heartbeat within 45 s, or reported online by hbbs.'}
+        conns:
+          type: array
+          description: Connection ids from the device's last heartbeat.
+          items: {type: integer}
+    IdAllowList:
+      type: object
+      required: [ids]
+      additionalProperties: false
+      properties:
+        ids:
+          type: array
+          maxItems: 200
+          uniqueItems: true
+          description: Duplicate IDs are rejected ignoring case.
+          items:
+            type: string
+            # RustDesk accepts numeric default IDs and alphabetic custom IDs (libs/hbb_common/src/lib.rs:257-259).
+            # Its server strips @ and matches case-insensitively (src/server/connection.rs:7051-7059,7089).
+            pattern: '^[A-Za-z0-9][A-Za-z0-9_]{5,15}$'
+    DeviceIdAllowList:
+      type: object
+      required: [ids, effective]
+      additionalProperties: false
+      properties:
+        ids:
+          type: array
+          maxItems: 200
+          uniqueItems: true
+          items: {type: string, pattern: '^[A-Za-z0-9][A-Za-z0-9_]{5,15}$'}
+        effective:
+          type: array
+          items:
+            type: object
+            required: [id, source, group_id, group_name]
+            additionalProperties: false
+            properties:
+              id: {type: string}
+              source: {type: string, enum: [global, group, device]}
+              group_id: {type: [string, 'null'], format: uuid}
+              group_name: {type: [string, 'null']}
+    AutoSortResult:
+      type: object
+      required: [moves, conflicts, unchanged]
+      additionalProperties: false
+      properties:
+        moves:
+          type: array
+          description: By hostname.
+          items:
+            type: object
+            required: [device, from_group, to_group]
+            additionalProperties: false
+            properties:
+              device: {$ref: '#/components/schemas/RuleDeviceRef'}
+              from_group:
+                oneOf:
+                  - {$ref: '#/components/schemas/GroupRef'}
+                  - {type: 'null'}
+              to_group: {$ref: '#/components/schemas/GroupRef'}
+        conflicts:
+          type: array
+          description: By hostname. Not moved; flagged with a group_conflict alert.
+          items:
+            type: object
+            required: [device, groups]
+            additionalProperties: false
+            properties:
+              device: {$ref: '#/components/schemas/RuleDeviceRef'}
+              groups: {type: array, items: {$ref: '#/components/schemas/GroupRef'}}
+        unchanged: {type: integer, minimum: 0}
+
+    GroupRef:
+      type: object
+      required: [id, name]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+    GroupRuleInput:
+      type: object
+      required: [pattern]
+      additionalProperties: false
+      properties:
+        pattern: {type: string, minLength: 1, maxLength: 128, pattern: '^[A-Za-z0-9._*?-]+$', description: 'Wildcards: * any run of characters, ? exactly one.'}
+    GroupRule:
+      type: object
+      required: [id, group_id, pattern, created_at, created_by]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        group_id: {type: string, format: uuid}
+        pattern: {type: string}
+        created_at: {type: string, format: date-time}
+        created_by:
+          oneOf:
+            - {$ref: '#/components/schemas/UserRef'}
+            - {type: 'null'}
+    RuleDeviceRef:
+      type: object
+      required: [id, rustdesk_id, hostname, alias, state, group_id]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        rustdesk_id: {type: string}
+        hostname: {type: string}
+        alias: {type: string}
+        state: {type: string, enum: [pending, approved]}
+        group_id: {type: [string, 'null'], format: uuid}
+    GroupRulePreview:
+      type: object
+      required: [match_count, matches, conflict_count, conflicts]
+      additionalProperties: false
+      properties:
+        match_count: {type: integer, minimum: 0}
+        conflict_count: {type: integer, minimum: 0}
+        matches: {type: array, maxItems: 200, items: {$ref: '#/components/schemas/RuleDeviceRef'}, description: By hostname; at most 200.}
+        conflicts:
+          type: array
+          maxItems: 200
+          description: Matching devices that another group's patterns also match.
+          items:
+            type: object
+            required: [device, groups]
+            additionalProperties: false
+            properties:
+              device: {$ref: '#/components/schemas/RuleDeviceRef'}
+              groups: {type: array, items: {$ref: '#/components/schemas/GroupRef'}}
+    Group:
+      type: object
+      required: [id, parent_id, name, policy_id, effective_policy_id, children]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        parent_id: {type: [string, 'null'], format: uuid}
+        name: {type: string, description: Unique among siblings.}
+        policy_id: {type: [string, 'null'], format: uuid, description: The group's own policy.}
+        effective_policy_id: {type: string, format: uuid, readOnly: true, description: The nearest assigned ancestor policy, or the default.}
+        children:
+          type: array
+          description: Child groups by name (filled by GET /groups; empty elsewhere).
+          items: {$ref: '#/components/schemas/Group'}
+    Server:
+      type: object
+      required: [id, name, id_host, relay_host, public_key, api_url, links_include_server, created_at, updated_at]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        id_host: {type: string}
+        relay_host: {type: string}
+        public_key: {type: string}
+        api_url: {type: string, description: 'Client API address given to clients; empty means http://<id host>:<client API port>.'}
+        links_include_server: {type: boolean, description: 'Connect links and commands name the ID server and key. False gives plain rustdesk://<id> links.'}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    AuditEvent:
+      type: object
+      required: [id, at, actor_user_id, actor_ip, action, target_type, target_id, details]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        at: {type: string, format: date-time}
+        actor_user_id: {type: [string, 'null'], format: uuid, description: Null for clients and the setup wizard.}
+        actor_ip: {type: string}
+        action: {type: string, description: 'For example device.approved, device.id_blocked, device.id_blocked_repeated, device.id_blocked_overflow, device.login_locked_out, device.login_locked_out_repeated, user.updated, tag.created.'}
+        target_type: {type: string}
+        target_id: {type: string}
+        details:
+          type: object
+          description: 'Action-specific, so open; changes carry {before, after} of the changed fields.'
+          additionalProperties: true
+    RemoteSession:
+      type: object
+      required: [id, device_id, device_name, rustdesk_id, peer_rustdesk_id, peer_name, type, client_ip, started_at, authed_at, ended_at, end_reason, disconnect_requested_at, duration_seconds]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        device_id: {type: string, format: uuid}
+        device_name: {type: string, description: 'The device alias, else its hostname, else its rustdesk_id.'}
+        rustdesk_id: {type: string, description: The device's RustDesk ID.}
+        peer_rustdesk_id: {type: string, description: 'RustDesk ID of the connecting peer; "" until it authenticated.'}
+        peer_name: {type: string}
+        type: {type: string, enum: [remote, file_transfer, port_forward, camera, terminal, unknown]}
+        client_ip: {type: [string, 'null'], description: Address of the connecting peer, when reported.}
+        started_at: {type: string, format: date-time}
+        authed_at: {type: [string, 'null'], format: date-time}
+        ended_at: {type: [string, 'null'], format: date-time, description: Null while the session is open.}
+        end_reason: {type: [string, 'null'], enum: [closed, stale, disconnected, null], description: 'disconnected: an admin had requested a disconnect when the session ended.'}
+        disconnect_requested_at: {type: [string, 'null'], format: date-time, description: When an admin asked for the session to be disconnected; null if nobody did.}
+        duration_seconds: {type: integer, minimum: 0, description: 'To ended_at, or to now while open.'}
+    SessionStats:
+      type: object
+      required: [range, tz, per_day, average_seconds, top_devices]
+      additionalProperties: false
+      properties:
+        range: {type: string, enum: [7d, 30d]}
+        tz: {type: string}
+        per_day:
+          type: array
+          description: One entry per day of the range, oldest first, zero days included.
+          items:
+            type: object
+            required: [day, count, total_seconds]
+            additionalProperties: false
+            properties:
+              day: {type: string, format: date}
+              count: {type: integer, minimum: 0}
+              total_seconds: {type: integer, minimum: 0}
+        average_seconds: {type: integer, minimum: 0, description: Mean session duration; 0 without sessions.}
+        top_devices:
+          type: array
+          maxItems: 5
+          description: By total_seconds, descending.
+          items:
+            type: object
+            required: [device_id, device_name, count, total_seconds]
+            additionalProperties: false
+            properties:
+              device_id: {type: string, format: uuid}
+              device_name: {type: string}
+              count: {type: integer, minimum: 1}
+              total_seconds: {type: integer, minimum: 0}
+    FleetHistory:
+      type: object
+      required: [range, step_seconds, points]
+      additionalProperties: false
+      properties:
+        range: {type: string, enum: [24h, 7d, 30d]}
+        step_seconds: {type: integer, enum: [300, 3600, 21600]}
+        points:
+          type: array
+          items:
+            type: object
+            required: [at, approved, online, pending, sessions]
+            additionalProperties: false
+            properties:
+              at: {type: string, format: date-time, description: Start of the bucket.}
+              approved: {type: integer, minimum: 0}
+              online: {type: integer, minimum: 0}
+              pending: {type: integer, minimum: 0}
+              sessions: {type: integer, minimum: 0, description: 'Peak of open, authenticated sessions of approved devices.'}
+    DashboardThresholds:
+      type: object
+      required: [offline_days, pending_hours, min_client_version]
+      additionalProperties: false
+      properties:
+        offline_days: {type: integer, minimum: 1, maximum: 365, description: 'An approved device that is offline and was last seen longer ago than this needs attention.'}
+        pending_hours: {type: integer, minimum: 1, maximum: 720, description: A pending device waiting longer than this needs attention.}
+        min_client_version:
+          type: string
+          pattern: '^(\d+(\.\d+){0,3})?$'
+          description: 'Approved devices with an older client version need attention. "" turns it off.'
+    DashboardModuleId:
+      type: string
+      enum: [fleet-pulse, quick-connect, approval-queue, needs-attention, live-sessions, activity-trend, fleet-overview, recent-sessions, session-analytics, platform-mix, admin-activity]
+    DashboardModuleSize:
+      type: string
+      enum: [small, medium, large]
+    DashboardCatalog:
+      type: object
+      description: >-
+        The dashboard is a grid of 4 columns and fixed-height rows. Each module offers
+        its own sizes, as columns x rows of that grid.
+      required: [modules, presets]
+      additionalProperties: false
+      properties:
+        modules:
+          type: array
+          items:
+            type: object
+            required: [id, default_size, sizes]
+            additionalProperties: false
+            properties:
+              id: {$ref: '#/components/schemas/DashboardModuleId'}
+              default_size: {$ref: '#/components/schemas/DashboardModuleSize'}
+              sizes:
+                type: array
+                description: Small to large; a module offers some or all three.
+                minItems: 1
+                items:
+                  type: object
+                  required: [name, cols, rows]
+                  additionalProperties: false
+                  properties:
+                    name: {$ref: '#/components/schemas/DashboardModuleSize'}
+                    cols: {type: integer, minimum: 1, maximum: 4}
+                    rows: {type: integer, minimum: 1, maximum: 4}
+        presets:
+          type: array
+          items:
+            type: object
+            required: [id, name, modules]
+            additionalProperties: false
+            properties:
+              id: {type: string, enum: [homelab, business, wall]}
+              name: {type: string}
+              modules:
+                type: array
+                description: The preset's modules, enabled, in order and at these sizes.
+                items:
+                  type: object
+                  required: [id, size]
+                  additionalProperties: false
+                  properties:
+                    id: {$ref: '#/components/schemas/DashboardModuleId'}
+                    size: {$ref: '#/components/schemas/DashboardModuleSize'}
+    Preferences:
+      type: object
+      required: [preset, modules, pinned_device_ids, theme, palette, density, toast_seconds]
+      additionalProperties: false
+      properties:
+        preset: {type: string, enum: [homelab, business, wall, custom]}
+        modules:
+          type: array
+          description: Every catalog module once, in display order.
+          items:
+            type: object
+            required: [id, enabled, size]
+            additionalProperties: false
+            properties:
+              id: {$ref: '#/components/schemas/DashboardModuleId'}
+              enabled: {type: boolean}
+              size:
+                $ref: '#/components/schemas/DashboardModuleSize'
+                description: >-
+                  One of the module's sizes in GET /dashboard/catalog. Responses always
+                  carry it; a PUT may leave it out for the module's default_size.
+        pinned_device_ids:
+          type: array
+          maxItems: 24
+          uniqueItems: true
+          items: {type: string, format: uuid}
+        theme: {type: string, enum: [dark, light, system], description: The colour mode.}
+        palette:
+          type: string
+          enum: [ferricade, indigo, graphite, ocean, violet, moss, sandstone]
+          description: >-
+            The colour theme; ferricade is the default, and each palette has light and dark variants.
+            Responses always carry it; a PUT may leave it out to keep the stored palette.
+        density: {type: string, enum: [comfortable, compact]}
+        toast_seconds:
+          type: integer
+          enum: [0, 3, 5, 10, 30]
+          description: >-
+            How long notifications stay before closing on their own; 0 = until closed. Default 5.
+            Responses always carry it; a PUT may leave it out to keep the stored value.
+    PreferencesPut:
+      type: object
+      required: [preset, modules, pinned_device_ids, theme, density]
+      additionalProperties: false
+      properties:
+        preset: {$ref: '#/components/schemas/Preferences/properties/preset'}
+        modules: {$ref: '#/components/schemas/Preferences/properties/modules'}
+        pinned_device_ids: {$ref: '#/components/schemas/Preferences/properties/pinned_device_ids'}
+        theme: {$ref: '#/components/schemas/Preferences/properties/theme'}
+        palette: {$ref: '#/components/schemas/Preferences/properties/palette'}
+        density: {$ref: '#/components/schemas/Preferences/properties/density'}
+        toast_seconds: {$ref: '#/components/schemas/Preferences/properties/toast_seconds'}
+    FleetMap:
+      type: object
+      required: [generated_at, truncated, devices]
+      additionalProperties: false
+      properties:
+        generated_at: {type: string, format: date-time}
+        truncated: {type: boolean}
+        devices:
+          type: array
+          maxItems: 2000
+          items: {$ref: '#/components/schemas/FleetMapDevice'}
+    FleetMapDevice:
+      type: object
+      required: [id, name, group_id, status]
+      additionalProperties: false
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        group_id: {type: [string, 'null'], format: uuid}
+        status: {type: string, enum: [alert, offline, online]}
+    FleetSummary:
+      type: object
+      required: [generated_at, devices, sessions, alerts, os, versions, groups, attention]
+      additionalProperties: false
+      properties:
+        generated_at: {type: string, format: date-time}
+        devices:
+          type: object
+          required: [approved, pending, rejected, archived, online]
+          additionalProperties: false
+          properties:
+            approved: {type: integer, minimum: 0}
+            pending: {type: integer, minimum: 0}
+            rejected: {type: integer, minimum: 0}
+            archived: {type: integer, minimum: 0}
+            online: {type: integer, minimum: 0, description: Approved devices that are online.}
+        sessions:
+          type: object
+          required: [active]
+          additionalProperties: false
+          properties:
+            active: {type: integer, minimum: 0, description: Open, authenticated sessions of approved devices.}
+        alerts:
+          type: object
+          required: [open]
+          additionalProperties: false
+          properties:
+            open: {type: integer, minimum: 0}
+        os:
+          type: array
+          description: Approved devices by operating system, most devices first (ties by name), Other last. Linux devices are listed by distribution when the client reports one (Ubuntu, Debian, ...); Linux when it reports none; Other only when the OS is empty or unknown.
+          items:
+            type: object
+            required: [name, count]
+            additionalProperties: false
+            properties:
+              name: {type: string, minLength: 1}
+              count: {type: integer, minimum: 1}
+        versions:
+          type: array
+          description: Approved devices by client version, newest first; "unknown" (no version reported) last and never outdated.
+          items:
+            type: object
+            required: [version, count, outdated]
+            additionalProperties: false
+            properties:
+              version: {type: string}
+              count: {type: integer, minimum: 1}
+              outdated: {type: boolean, description: Below the owner's minimum client version.}
+        groups:
+          type: array
+          description: Approved devices per group, sorted by name; the "Ungrouped" entry (id null) comes last and only when it has devices.
+          items:
+            type: object
+            required: [id, name, online, total]
+            additionalProperties: false
+            properties:
+              id: {type: [string, 'null'], format: uuid}
+              name: {type: string}
+              online: {type: integer, minimum: 0}
+              total: {type: integer, minimum: 0}
+        attention:
+          type: array
+          maxItems: 50
+          description: Sorted by kind in the order below, then oldest since first.
+          items:
+            type: object
+            required: [kind, device_id, rustdesk_id, name, since, detail]
+            additionalProperties: false
+            properties:
+              kind:
+                type: string
+                enum: [uuid_mismatch, access_window_unconfirmed, group_conflict, pending_long, offline_long, outdated_client]
+                description: |
+                  uuid_mismatch: an open alert (since = when it was raised).
+                  access_window_unconfirmed: an open access_window_unconfirmed alert; since = when it was raised.
+                  group_conflict: an open group_conflict alert; since = when it was raised; detail = the matching groups.
+                  pending_long: pending
+                  longer than pending_hours (since = first seen). offline_long: approved, offline and
+                  last seen longer ago than offline_days (since = last seen). outdated_client:
+                  approved and below min_client_version (since = first seen).
+              device_id: {type: string, format: uuid}
+              rustdesk_id: {type: string}
+              name: {type: string, description: 'Alias, else hostname, else RustDesk ID.'}
+              since: {type: string, format: date-time}
+              detail: {type: string, description: A short sentence for display.}
+    LiveEvent:
+      type: object
+      description: >-
+        The data of one message of the /events stream; the message's event name is
+        its type. Only the IDs the type concerns are set: device_id for device.*,
+        session_id and device_id for session.*, audit_id for audit.created, user_id for
+        preferences.updated, none for group_rules.updated, id_allow_list.updated and resync.
+      required: [type]
+      additionalProperties: false
+      properties:
+        type:
+          type: string
+          enum: [device.updated, device.enrolled, device.deleted, device.online, device.offline, session.started, session.updated, session.ended, audit.created, preferences.updated, group_rules.updated, id_allow_list.updated, resync]
+        device_id: {type: string, format: uuid}
+        session_id: {type: string, format: uuid}
+        audit_id: {type: string, format: uuid}
+        user_id: {type: string, format: uuid}
+    NextCursor:
+      type: string
+      description: Cursor of the next page; "" on the last page.
+    Check:
+      type: object
+      required: [name, ok, detail, target, address, reason]
+      additionalProperties: false
+      properties:
+        name: {type: string, enum: [id-server, relay, client-api, hbbs-online-query]}
+        ok: {type: boolean}
+        detail: {type: string, description: Error text of a failed check; empty when ok.}
+        target: {type: string, description: 'host:port the check dialed, as configured; empty for a User.'}
+        address: {type: string, description: 'IP:port actually connected to, or where the dial failed; empty when the name did not resolve, and for a User.'}
+        reason:
+          type: ['string', 'null']
+          enum: [dns, refused, timeout, unreachable, other, null]
+          description: Why a failed check failed; null when ok.
+    ServerHealth:
+      type: object
+      required: [status, checked_at, checks]
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, unknown]
+          description: |
+            ok: every check of the latest round passed. degraded: at least one failed.
+            unknown: no round has finished yet (just started, or setup is not complete).
+        checked_at:
+          type: [string, 'null']
+          format: date-time
+          description: When the latest round finished; null while unknown.
+        checks:
+          type: array
+          description: The latest round, in the order of POST /server/check; empty while unknown.
+          items: {$ref: '#/components/schemas/HealthCheck'}
+    HealthCheck:
+      type: object
+      required: [name, ok, detail, target, address, reason, since]
+      additionalProperties: false
+      properties:
+        name: {type: string, enum: [id-server, relay, client-api, hbbs-online-query]}
+        ok: {type: boolean}
+        detail: {type: string, description: Error text of a failed check; empty when ok, and always empty for a User.}
+        target: {type: string, description: 'host:port the check dialed, as configured; empty for a User.'}
+        address: {type: string, description: 'IP:port actually connected to, or where the dial failed; empty when the name did not resolve, and for a User.'}
+        reason:
+          type: ['string', 'null']
+          enum: [dns, refused, timeout, unreachable, other, null]
+          description: Why a failed check failed; null when ok.
+        since:
+          type: string
+          format: date-time
+          description: When this check last changed between passing and failing (its first round if it never changed).
+    ClientConfig:
+      type: object
+      required: [config_string, deep_link, api, host, relay, key, install]
+      additionalProperties: false
+      properties:
+        config_string:
+          type: string
+          description: |
+            reverse(base64url_nopad(JSON {host, relay, api, key})), as the RustDesk client imports it:
+            paste it in Settings → Network → ID/Relay server → "Import server config".
+        deep_link:
+          type: string
+          description: |
+            rustdesk://config/<config_string>. Mobile clients only, and only those built with the
+            option that accepts config links; the 1.5.0 desktop client ignores it.
+        api: {type: string, description: 'api_url when set, otherwise http://<id host>:<client API port>'}
+        host: {type: string}
+        relay: {type: string}
+        key: {type: string}
+        install:
+          type: object
+          required: [windows, macos, linux]
+          additionalProperties: false
+          properties:
+            windows: {type: string}
+            macos: {type: string}
+            linux: {type: string}
+    OIDCPublic:
+      type: object
+      required: [enabled, display_name]
+      additionalProperties: false
+      properties:
+        enabled: {type: boolean}
+        display_name: {type: string, description: The sign-in button's label, e.g. "Authentik".}
+    OIDCTestResult:
+      type: object
+      required: [tested_at, ok, error, authorization_endpoint, token_endpoint, userinfo_endpoint, groups_scope_supported]
+      additionalProperties: false
+      properties:
+        tested_at: {type: string, format: date-time}
+        ok: {type: boolean}
+        error:
+          type: [string, 'null']
+          enum: [unreachable, bad_status, not_json, issuer_mismatch, missing_endpoints, null]
+          description: Null when ok.
+        authorization_endpoint: {type: [string, 'null']}
+        token_endpoint: {type: [string, 'null']}
+        userinfo_endpoint: {type: [string, 'null']}
+        groups_scope_supported: {type: boolean}
+    OIDCSettings:
+      type: object
+      required: [enabled, display_name, issuer, client_id, client_secret_set, redirect_uri, groups_claim, owner_groups, admin_groups, user_groups, jit_enabled, last_test, updated_at]
+      additionalProperties: false
+      properties:
+        enabled: {type: boolean}
+        display_name: {type: string}
+        issuer: {type: string, description: Empty until set.}
+        client_id: {type: string}
+        client_secret_set: {type: boolean, description: The secret itself is never returned.}
+        redirect_uri: {type: string, description: '<PUBLIC_URL>/admin/api/v1/auth/oidc/callback, to register at the provider.'}
+        groups_claim: {type: string}
+        owner_groups: {type: array, items: {type: string}}
+        admin_groups: {type: array, items: {type: string}}
+        user_groups: {type: array, items: {type: string}}
+        jit_enabled: {type: boolean}
+        last_test:
+          oneOf:
+            - {$ref: '#/components/schemas/OIDCTestResult'}
+            - {type: 'null'}
+        updated_at: {type: [string, 'null'], format: date-time}
+    DeploymentSecretState:
+      type: object
+      required: [set, set_at, set_by]
+      additionalProperties: false
+      properties:
+        set:
+          type: boolean
+          description: A value is stored. After a SECRET_KEY change it may be unreadable; the script download then fails with bad_request until the value is set again.
+        set_at: {type: [string, 'null'], format: date-time}
+        set_by:
+          oneOf:
+            - type: object
+              required: [id, display_name]
+              additionalProperties: false
+              properties:
+                id: {type: string, format: uuid}
+                display_name: {type: string}
+            - {type: 'null'}
+    DeploymentSetting:
+      type: object
+      required: [key, label, help, type, values, value_labels, default, os, source]
+      additionalProperties: false
+      properties:
+        key: {type: string}
+        label: {type: string}
+        help: {type: string}
+        type: {type: string, enum: [bool, enum]}
+        values: {type: array, items: {type: string}}
+        value_labels: {type: object, additionalProperties: {type: string}}
+        default: {type: string}
+        os: {type: array, items: {type: string, enum: [windows, linux, macos]}}
+        source: {type: string}
+    DeploymentSettingValue:
+      type: object
+      required: [include, value]
+      additionalProperties: false
+      properties:
+        include: {type: boolean}
+        value: {type: string}
+    DeploymentEditable:
+      type: object
+      required: [installer_source, client_version, url_windows, url_deb, url_rpm, sha256_windows, sha256_deb, sha256_rpm, allow_downgrade, include_install, include_password, include_unlock_pin, include_id_allow_list, settings]
+      additionalProperties: false
+      properties:
+        installer_source: {type: string, enum: [github, url]}
+        client_version: {type: string, description: "latest: the script asks GitHub for the newest RustDesk release each time it runs (GitHub installer source only); otherwise major.minor.patch."}
+        url_windows: {type: string, description: 'Installer URL; non-HTTPS URLs require sha256_windows.'}
+        url_deb: {type: string, description: 'Installer URL; non-HTTPS URLs require sha256_deb.'}
+        url_rpm: {type: string, description: 'Installer URL; non-HTTPS URLs require sha256_rpm.'}
+        sha256_windows: {type: string, description: 'SHA-256 required when url_windows is not HTTPS.'}
+        sha256_deb: {type: string, description: 'SHA-256 required when url_deb is not HTTPS.'}
+        sha256_rpm: {type: string, description: 'SHA-256 required when url_rpm is not HTTPS.'}
+        allow_downgrade: {type: boolean}
+        include_install: {type: boolean}
+        include_password:
+          type: boolean
+          description: When true, the script sets the stored fleet password, or removes the device's permanent password when none is stored. When false, the script leaves it unchanged.
+        include_unlock_pin:
+          type: boolean
+          description: When true, the script sets the stored unlock PIN, or removes the device's unlock PIN when none is stored. When false, the script leaves it unchanged.
+        include_id_allow_list:
+          type: boolean
+          description: When true, the script sets the device's ID allow list (`id-whitelist`) to the global ID allow list as it is when the script is generated. Nothing is set when the list is empty.
+        settings:
+          type: object
+          additionalProperties: {$ref: '#/components/schemas/DeploymentSettingValue'}
+    DeploymentProfile:
+      type: object
+      required: [installer_source, client_version, url_windows, url_deb, url_rpm, sha256_windows, sha256_deb, sha256_rpm, allow_downgrade, include_install, include_password, include_unlock_pin, include_id_allow_list, settings, catalog, password, unlock_pin, updated_at]
+      additionalProperties: false
+      properties:
+        installer_source: {type: string, enum: [github, url]}
+        client_version: {type: string, description: "latest: the script asks GitHub for the newest RustDesk release each time it runs (GitHub installer source only); otherwise major.minor.patch."}
+        url_windows: {type: string, description: 'Installer URL; non-HTTPS URLs require sha256_windows.'}
+        url_deb: {type: string, description: 'Installer URL; non-HTTPS URLs require sha256_deb.'}
+        url_rpm: {type: string, description: 'Installer URL; non-HTTPS URLs require sha256_rpm.'}
+        sha256_windows: {type: string, description: 'SHA-256 required when url_windows is not HTTPS.'}
+        sha256_deb: {type: string, description: 'SHA-256 required when url_deb is not HTTPS.'}
+        sha256_rpm: {type: string, description: 'SHA-256 required when url_rpm is not HTTPS.'}
+        allow_downgrade: {type: boolean}
+        include_install: {type: boolean}
+        include_password:
+          type: boolean
+          description: When true, the script sets the stored fleet password, or removes the device's permanent password when none is stored. When false, the script leaves it unchanged.
+        include_unlock_pin:
+          type: boolean
+          description: When true, the script sets the stored unlock PIN, or removes the device's unlock PIN when none is stored. When false, the script leaves it unchanged.
+        include_id_allow_list:
+          type: boolean
+          description: When true, the script sets the device's ID allow list (`id-whitelist`) to the global ID allow list as it is when the script is generated. Nothing is set when the list is empty.
+        settings:
+          type: object
+          additionalProperties: {$ref: '#/components/schemas/DeploymentSettingValue'}
+        catalog: {type: array, items: {$ref: '#/components/schemas/DeploymentSetting'}}
+        password: {$ref: '#/components/schemas/DeploymentSecretState'}
+        unlock_pin: {$ref: '#/components/schemas/DeploymentSecretState'}
+        updated_at: {type: [string, 'null'], format: date-time}
+    DeploymentProfilePut:
+      type: object
+      required: [installer_source, client_version, url_windows, url_deb, url_rpm, sha256_windows, sha256_deb, sha256_rpm, allow_downgrade, include_install, include_password, include_unlock_pin, include_id_allow_list, settings]
+      additionalProperties: false
+      properties:
+        installer_source: {type: string, enum: [github, url]}
+        client_version: {type: string, description: "latest: the script asks GitHub for the newest RustDesk release each time it runs (GitHub installer source only); otherwise major.minor.patch."}
+        url_windows: {type: string, description: 'Installer URL; non-HTTPS URLs require sha256_windows.'}
+        url_deb: {type: string, description: 'Installer URL; non-HTTPS URLs require sha256_deb.'}
+        url_rpm: {type: string, description: 'Installer URL; non-HTTPS URLs require sha256_rpm.'}
+        sha256_windows: {type: string, description: 'SHA-256 required when url_windows is not HTTPS.'}
+        sha256_deb: {type: string, description: 'SHA-256 required when url_deb is not HTTPS.'}
+        sha256_rpm: {type: string, description: 'SHA-256 required when url_rpm is not HTTPS.'}
+        allow_downgrade: {type: boolean}
+        include_install: {type: boolean}
+        include_password:
+          type: boolean
+          description: When true, the script sets the stored fleet password, or removes the device's permanent password when none is stored. When false, the script leaves it unchanged.
+        include_unlock_pin:
+          type: boolean
+          description: When true, the script sets the stored unlock PIN, or removes the device's unlock PIN when none is stored. When false, the script leaves it unchanged.
+        include_id_allow_list:
+          type: boolean
+          description: When true, the script sets the device's ID allow list (`id-whitelist`) to the global ID allow list as it is when the script is generated. Nothing is set when the list is empty.
+        settings:
+          type: object
+          additionalProperties: {$ref: '#/components/schemas/DeploymentSettingValue'}
+        fleet_password: {type: [string, 'null'], writeOnly: true}
+        unlock_pin: {type: [string, 'null'], writeOnly: true}
+
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      description: Resource ID; anything but a UUID is 404.
+      schema: {type: string, format: uuid}
+    limit:
+      name: limit
+      in: query
+      description: Page size; default 50, at most 200 are returned.
+      schema: {type: integer, minimum: 1}
+    cursor:
+      name: cursor
+      in: query
+      description: The previous page's next_cursor.
+      schema: {type: string}
+
+  responses:
+    Device:
+      description: The device.
+      content: {application/json: {schema: {$ref: '#/components/schemas/Device'}}}
+    Group:
+      description: The group.
+      content: {application/json: {schema: {$ref: '#/components/schemas/Group'}}}
+    Tag:
+      description: The tag.
+      content: {application/json: {schema: {$ref: '#/components/schemas/Tag'}}}
+    User:
+      description: The user. Password hashes and TOTP secrets are never returned.
+      content: {application/json: {schema: {$ref: '#/components/schemas/User'}}}
+    Server:
+      description: The server profile.
+      content: {application/json: {schema: {$ref: '#/components/schemas/Server'}}}
+    BadRequest:
+      description: |
+        Malformed body (unknown field, wrong type, trailing data, over 64 KiB), an invalid
+        field, or, for a change (which is audited with the client's address), a client
+        address that cannot be determined.
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Unauthenticated:
+      description: No valid session (or setup token).
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Forbidden:
+      description: '"csrf", "mfa_required", "totp_enroll_required", "forbidden" or "reauthentication_required".'
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    NotFound:
+      description: Not found; for /setup, setup is already complete.
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Incomplete:
+      description: An earlier step is missing.
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Locked:
+      description: Too many consecutive failures; the lock lasts 1 minute and doubles with each further failure, up to 1 hour.
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    RateLimited:
+      description: 20 failed attempts from this address (an IPv6 /64) within 10 minutes.
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Internal:
+      description: Internal error; the body carries request_id.
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+    Busy:
+      description: |
+        "busy": every password-hashing slot stayed taken for 2 seconds. Nothing was
+        checked or counted as a failure; retry after the Retry-After delay (1 s).
+      headers:
+        Retry-After: {schema: {type: integer, const: 1}}
+      content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+
+security:
+  - session: []
+    csrf: []
+
+paths:
+  /admin/api/v1/devices/auto-sort/preview:
+    post:
+      summary: Dry run of Auto sort all (Owner)
+      description: |
+        What POST /devices/auto-sort would do now, without changing anything. Approved devices
+        only: one matching group → moved there (also from a manually chosen group); no match →
+        unchanged; two or more → conflict (not moved, flagged).
+      responses:
+        '200': {description: The dry run., content: {application/json: {schema: {$ref: '#/components/schemas/AutoSortResult'}}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/devices/auto-sort:
+    post:
+      summary: Auto sort all approved devices by the group patterns (Owner)
+      description: |
+        Recomputes and applies the dry run in one transaction; runs never overlap. Every move is
+        audited as device.updated (reason auto_sort) and the run as devices.auto_sorted. After the
+        run, exactly the conflicting devices have an open group_conflict alert.
+        Lock acquisition waits at most 5 seconds; a timeout returns 503 busy without changes.
+      responses:
+        '200': {description: What the run did., content: {application/json: {schema: {$ref: '#/components/schemas/AutoSortResult'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+        '503':
+          description: 'busy: auto sort could not start: devices are busy, try again. Nothing changed.'
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+
+  /admin/api/v1/auth/login:
+    post:
+      summary: Sign in with username and password
+      description: |
+        Starts a session with mfa_passed=false, replacing the browser's previous
+        session, and sets the session cookie (Secure, HttpOnly, SameSite=Strict, Path=/).
+        A wrong password and an unknown username give the same 401, and both lock
+        after 5 consecutive failures (423).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              additionalProperties: false
+              properties:
+                username: {type: string}
+                password: {type: string}
+      responses:
+        '200':
+          description: Signed in.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mfa_required, csrf_token]
+                additionalProperties: false
+                properties:
+                  mfa_required:
+                    type: boolean
+                    description: True when the session must pass /auth/totp (TOTP enrolled) or enroll TOTP (TOTP required) before using the API.
+                  csrf_token: {type: string}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '423': {$ref: '#/components/responses/Locked'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '500': {$ref: '#/components/responses/Internal'}
+        '503': {$ref: '#/components/responses/Busy'}
+
+  /admin/api/v1/auth/logout:
+    post:
+      summary: End the session
+      responses:
+        '204': {description: Signed out; the cookie is cleared.}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/auth/me:
+    get:
+      summary: The signed-in user and session state
+      responses:
+        '200':
+          description: Current session.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user, mfa_passed, totp_enrolled, csrf_token]
+                additionalProperties: false
+                properties:
+                  user: {$ref: '#/components/schemas/User'}
+                  mfa_passed: {type: boolean}
+                  totp_enrolled: {type: boolean}
+                  csrf_token: {type: string}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/auth/totp:
+    post:
+      summary: Pass the second factor
+      description: |
+        A correct code not used before marks the session MFA-passed and rotates it
+        (new cookie and CSRF token). A wrong code gives 400 "invalid_code" and the
+        session stays valid; 5 consecutive wrong codes lock TOTP for the account
+        (423) on the login lockout schedule, and a new password login does not
+        reset that count. A right code whose 30 s step was already used (for
+        example the code just used for enrollment) gives 400 "code_already_used"
+        and does not count as a failure. Parallel attempts are bounded: an attempt
+        in flight counts towards both the per-account and the per-address limit.
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/Code'}}}
+      responses:
+        '200':
+          description: MFA passed.
+          content: {application/json: {schema: {$ref: '#/components/schemas/CSRFToken'}}}
+        '400':
+          description: '"invalid_code" (wrong code), "code_already_used" (wait for the next code), or "bad_request" (malformed body, or TOTP not set up).'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '423': {$ref: '#/components/responses/Locked'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/auth/password:
+    post:
+      summary: Change the signed-in user's password
+      description: |
+        Needs the current password. The new one must be at least 12 characters, not a
+        common password and not the username. Ends the user's other sessions and
+        rotates this one.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [current_password, new_password]
+              additionalProperties: false
+              properties:
+                current_password: {type: string}
+                new_password: {type: string}
+      responses:
+        '200':
+          description: Password changed.
+          content: {application/json: {schema: {$ref: '#/components/schemas/CSRFToken'}}}
+        '400':
+          description: '"bad_request", or "weak_password" when the new password fails the policy.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403':
+          description: '"forbidden" when the current password is wrong; also "csrf", "mfa_required", "totp_enroll_required".'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '500': {$ref: '#/components/responses/Internal'}
+        '503': {$ref: '#/components/responses/Busy'}
+
+  /admin/api/v1/auth/totp/enroll:
+    post:
+      summary: Start TOTP enrollment
+      description: |
+        Returns a new secret, held for this session for 10 minutes until confirmed.
+        A user who already has TOTP must have passed it in this session (else 403
+        "mfa_required"). Re-enrolling for a password account requires current_password
+        (else 403 "forbidden"); an SSO-only account must have signed in within 5 minutes
+        (else 403 "reauthentication_required").
+      requestBody:
+        required: false
+        content: {application/json: {schema: {$ref: '#/components/schemas/TOTPEnrollRequest'}}}
+      responses:
+        '200':
+          description: New secret.
+          content: {application/json: {schema: {$ref: '#/components/schemas/TOTPSecret'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/auth/totp/enroll/verify:
+    post:
+      summary: Confirm TOTP enrollment
+      description: |
+        A correct code from the pending secret stores it as the user's TOTP secret
+        and rotates the session as MFA-passed.
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/Code'}}}
+      responses:
+        '200':
+          description: Enrolled.
+          content: {application/json: {schema: {$ref: '#/components/schemas/CSRFToken'}}}
+        '400':
+          description: '"invalid_code" (wrong code), "code_already_used" (the step of the last accepted code; wait for the next one), or "bad_request".'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Incomplete'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/auth/oidc:
+    get:
+      summary: Whether OIDC sign-in is offered
+      security: []
+      responses:
+        '200':
+          description: The sign-in page's OIDC button state.
+          content: {application/json: {schema: {$ref: '#/components/schemas/OIDCPublic'}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/auth/oidc/start:
+    get:
+      summary: Start an OIDC sign-in (browser navigation)
+      description: |
+        Sets a short-lived flow cookie (__Host-ferricade_oidc: sealed, 5 minutes, HttpOnly, Secure,
+        SameSite=Lax) and redirects to the provider. When OIDC is off or misconfigured, or the
+        client is rate-limited, redirects to /sign-in?sso_error=<code> instead.
+      security: []
+      parameters:
+        - {name: next, in: query, required: false, schema: {type: string}, description: 'Where to go after signing in; must pass the same safe-next rules as sign-in.'}
+      responses:
+        '302':
+          description: To the provider, or to /sign-in?sso_error=provider_error|rate_limited.
+          headers:
+            Location: {required: true, schema: {type: string}}
+
+  /admin/api/v1/auth/oidc/callback:
+    get:
+      summary: Finish an OIDC sign-in (the provider's redirect)
+      description: |
+        Verifies state, nonce and the ID token, resolves the account (linked subject, then a
+        verified email matching exactly one account, then JIT if enabled), sets the role from
+        the groups, and starts a session with mfa_passed=true. On success it answers a small
+        same-origin page that moves to `next` with a meta refresh (not a 302, so the SameSite=Strict
+        session cookie is sent). On failure it redirects to /sign-in?sso_error=<code>, one of
+        not_allowed, no_account, account_conflict, disabled, provider_error, expired, rate_limited. Every outcome is
+        audited.
+      security: []
+      parameters:
+        - {name: code, in: query, required: false, schema: {type: string}}
+        - {name: state, in: query, required: false, schema: {type: string}}
+        - {name: error, in: query, required: false, schema: {type: string}}
+        - {name: error_description, in: query, required: false, schema: {type: string}}
+      responses:
+        '200':
+          description: Signed in; same-origin page moves to next.
+          content: {text/html: {schema: {type: string}}}
+        '302':
+          description: Refused or failed; to /sign-in?sso_error=<code>.
+          headers:
+            Location: {required: true, schema: {type: string}}
+
+  /admin/api/v1/settings/oidc:
+    get:
+      summary: The OIDC sign-in settings (Owner)
+      responses:
+        '200': {description: Settings; secret never returned., content: {application/json: {schema: {$ref: '#/components/schemas/OIDCSettings'}}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+    patch:
+      summary: Edit the OIDC sign-in settings (Owner)
+      description: |
+        Absent fields are kept; an absent client_secret keeps the stored one. The issuer must be
+        https (http://localhost and http://127.0.0.1 are allowed for testing). Turning it on
+        needs an issuer, a client ID, a client secret and at least one owner, admin or user group.
+        Audited as settings.oidc_updated with the names of the changed fields (never the secret).
+        In DEV_INSECURE mode any http issuer is allowed.
+        Roles from groups: owner if any owner group matches, else admin, else user; no match refuses the sign-in.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                enabled: {type: boolean}
+                display_name: {type: string, minLength: 1, maxLength: 64}
+                issuer: {type: string, maxLength: 512}
+                client_id: {type: string, maxLength: 256}
+                client_secret: {type: string, minLength: 1, maxLength: 1024}
+                groups_claim: {type: string, minLength: 1, maxLength: 128}
+                owner_groups: {type: array, maxItems: 32, items: {type: string, minLength: 1, maxLength: 256}}
+                admin_groups: {type: array, maxItems: 32, items: {type: string, minLength: 1, maxLength: 256}}
+                user_groups: {type: array, maxItems: 32, items: {type: string, minLength: 1, maxLength: 256}}
+                jit_enabled: {type: boolean}
+      responses:
+        '200': {description: Saved settings., content: {application/json: {schema: {$ref: '#/components/schemas/OIDCSettings'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/settings/oidc/test:
+    post:
+      summary: Test the provider discovery document (Owner)
+      description: |
+        Fetches <issuer>/.well-known/openid-configuration (5 s timeout) with the saved issuer and
+        stores the result as last_test. A failed discovery is a result (ok=false with an error
+        code), not an HTTP error.
+      responses:
+        '200': {description: Test result., content: {application/json: {schema: {$ref: '#/components/schemas/OIDCTestResult'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/server/client-config:
+    get:
+      summary: Client configuration for the server profile
+      description: The same object /setup/complete returned. 404 until setup is complete.
+      responses:
+        '200':
+          description: Client configuration.
+          content: {application/json: {schema: {$ref: '#/components/schemas/ClientConfig'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/deployment/profile:
+    get:
+      summary: Get the deployment profile (Owner or Admin)
+      responses:
+        '200': {description: The profile and settings catalog., content: {application/json: {schema: {$ref: '#/components/schemas/DeploymentProfile'}}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+    put:
+      summary: Save the deployment profile (Owner)
+      description: Secrets are write-only; absent keeps, a string sets, null removes. Profile and secret changes are audited together without secret values.
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/DeploymentProfilePut'}}}
+      responses:
+        '200': {description: The saved profile., content: {application/json: {schema: {$ref: '#/components/schemas/DeploymentProfile'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/deployment/script:
+    post:
+      summary: Download a deployment script (Owner or Admin)
+      description: Audited when served. Requires completed setup.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [os]
+              additionalProperties: false
+              properties:
+                os: {type: string, enum: [windows, linux]}
+      responses:
+        '200':
+          description: Rendered script.
+          headers:
+            Content-Disposition: {schema: {type: string}}
+            Cache-Control: {schema: {type: string, const: no-store}}
+          content: {text/plain: {schema: {type: string}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /setup/status:
+    get:
+      summary: Whether first-run setup is complete
+      description: |
+        Lets the web UI choose between the setup wizard and the sign-in page. Needs
+        no session and no setup token, and, unlike the other /setup paths, keeps
+        answering after setup completes.
+      security: []
+      responses:
+        '200':
+          description: Setup state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [setup_complete]
+                additionalProperties: false
+                properties:
+                  setup_complete: {type: boolean}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /setup/owner:
+    post:
+      summary: Create the owner account
+      description: |
+        Creates the owner with TOTP required. Repeating this step before setup
+        completes overwrites the same owner and restarts its TOTP enrollment.
+        Username: 1 to 64 of letters, digits, '.', '_', '-', '@'. Password: at least
+        12 characters, not common, not the username.
+      security:
+        - setupToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              additionalProperties: false
+              properties:
+                username: {type: string}
+                password: {type: string}
+                display_name: {type: string, maxLength: 128}
+                email: {type: string, format: email}
+      responses:
+        '201':
+          description: Owner created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id]
+                additionalProperties: false
+                properties:
+                  id: {type: string, format: uuid}
+        '400':
+          description: '"bad_request", or "weak_password".'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+        '503': {$ref: '#/components/responses/Busy'}
+
+  /setup/owner/totp:
+    post:
+      summary: Generate the owner's TOTP secret
+      description: Replaces any earlier secret, which must then be verified again.
+      security:
+        - setupToken: []
+      responses:
+        '200':
+          description: New secret.
+          content: {application/json: {schema: {$ref: '#/components/schemas/TOTPSecret'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Incomplete'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /setup/owner/totp/verify:
+    post:
+      summary: Confirm the owner's TOTP secret
+      security:
+        - setupToken: []
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/Code'}}}
+      responses:
+        '200':
+          description: Verified.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [verified]
+                additionalProperties: false
+                properties:
+                  verified: {type: boolean, const: true}
+        '400':
+          description: '"invalid_code" (wrong code), "code_already_used" (wait for the next code), or "bad_request".'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Incomplete'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /setup/server:
+    post:
+      summary: Save the server profile and check it
+      description: |
+        Validates and saves the profile (creating it or updating the existing one),
+        then dials the ID server (default port 21116), relay (21117), the client API address the
+        clients are given (ID host, default port 21114), and runs an online query against
+        HBBS_ADDR when set. A stored api_url and links_include_server are kept; when set, the client API check dials its
+        host and port. The profile stays saved whatever the checks report. An empty name becomes
+        "default".
+      security:
+        - setupToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id_host, relay_host, public_key]
+              additionalProperties: false
+              properties:
+                name: {type: string, maxLength: 128}
+                id_host: {type: string, description: 'Required. A DNS name, IPv4 address or IPv6 address (bracketed when a port follows), optionally with :port (1-65535).'}
+                relay_host: {type: string, description: 'Required; same form as id_host.'}
+                public_key: {type: string, description: Base64 of 32 bytes (hbbs id_ed25519.pub).}
+      responses:
+        '200':
+          description: Saved; check results follow.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [saved, server_id, checks]
+                additionalProperties: false
+                properties:
+                  saved: {type: boolean, const: true}
+                  server_id: {type: string, format: uuid}
+                  checks:
+                    type: array
+                    items: {$ref: '#/components/schemas/Check'}
+        '400':
+          description: '"bad_request" (missing or malformed host), or "invalid_key".'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /setup/complete:
+    post:
+      summary: Finish setup
+      description: Needs a verified owner TOTP and a saved server. Afterwards every /setup path is 404.
+      security:
+        - setupToken: []
+      responses:
+        '200':
+          description: Setup complete.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [client_config]
+                additionalProperties: false
+                properties:
+                  client_config: {$ref: '#/components/schemas/ClientConfig'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Incomplete'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/devices:
+    get:
+      summary: List devices
+      description: |
+        Devices ordered by sort (default rustdesk_id), with rustdesk_id and id as
+        tie-breakers in the same direction. name uses lower(coalesce(nullif(alias,''),
+        nullif(hostname,''), rustdesk_id)). status ranks open alerts, pending, online,
+        offline. state ranks pending, approved, rejected, archived. os uses lower(os),
+        with empty values last. group uses lower(group name), with no group last;
+        a User's hidden groups count as no group. desc reverses the entire order.
+        Cursors are opaque and valid only with the same sort, order and filters;
+        a different sort or order returns 400 bad_request (cursor does not match sort).
+        Status changes between pages may cause a device to appear twice or be skipped.
+        For example, GET /admin/api/v1/devices?sort=name&order=desc&limit=2
+        returns alias "zeta" before hostname "Yak", with an opaque next_cursor if more follow.
+        Add subgroups=true with a group filter to include the selected group and all descendants,
+        for example GET /admin/api/v1/devices?group=<JCC>&subgroups=true&sort=name.
+        The online filter is applied to each page after
+        it is read (online state lives in memory), so a page can hold fewer than limit
+        items, or none, while next_cursor is set; keep following next_cursor.
+        For a User: only their visible devices; a state filter other than approved returns no items.
+      parameters:
+        - {name: sort, in: query, description: 'Sort key; default rustdesk_id. See the description for each key.', schema: {type: string, enum: [rustdesk_id, name, status, state, os, group], default: rustdesk_id}}
+        - {name: order, in: query, schema: {type: string, enum: [asc, desc], default: asc}}
+        - {name: state, in: query, schema: {type: string, enum: [pending, approved, rejected, archived]}}
+        - {name: online, in: query, schema: {type: boolean}}
+        - {name: tag, in: query, description: Tag ID., schema: {type: string, format: uuid}}
+        - {name: group, in: query, description: 'Group ID (the group itself; add subgroups=true for its descendants too).', schema: {type: string, format: uuid}}
+        - {name: subgroups, in: query, description: 'With group: true = the group and all its descendant groups. 400 without group or with ungrouped=true. For a User, only descendants within their grants.', schema: {type: boolean}}
+        - {name: ungrouped, in: query, description: 'true = only devices without a group (for a User: devices whose group is not one of theirs, i.e. shown with group_id null). Cannot be combined with group (400).', schema: {type: boolean}}
+        - {name: os, in: query, description: Case-insensitive prefix of the OS., schema: {type: string, maxLength: 256}}
+        - {name: q, in: query, description: 'Case-insensitive substring of rustdesk_id, alias, hostname or username.', schema: {type: string, maxLength: 256}}
+        - {$ref: '#/components/parameters/limit'}
+        - {$ref: '#/components/parameters/cursor'}
+      responses:
+        '200':
+          description: A page of devices.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                additionalProperties: false
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/Device'}}
+                  next_cursor: {$ref: '#/components/schemas/NextCursor'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/devices/{id}:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    get:
+      summary: Get a device
+      description: >-
+        For a User, a device outside their grants is 404. For a User, approved_by is null and group_id is null unless
+        the group is one of theirs. For a User, alert addresses are empty.
+      responses:
+        '200': {$ref: '#/components/responses/Device'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+    patch:
+      summary: Edit a device
+      description: |
+        Absent fields are kept. group_id null removes the device from its group;
+        tag_ids replaces the device's tags. Audited as device.updated with the
+        fields' values before and after. A PATCH that sets group_id (even to the
+        group the device is already in) also resolves an open group_conflict alert.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                alias: {type: string, maxLength: 128}
+                note: {type: string, maxLength: 4096}
+                group_id: {type: [string, 'null'], format: uuid}
+                tag_ids: {type: array, items: {type: string, format: uuid}}
+      responses:
+        '200': {$ref: '#/components/responses/Device'}
+        '400':
+          description: '"bad_request": malformed body, field too long, or an unknown group or tag.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+    delete:
+      summary: Delete a device
+      description: |
+        Removes the device in any state, with its tags, alerts and remote-session
+        history. Audited as device.deleted, whose details keep the device's
+        rustdesk_id, hostname, alias, state and the number of sessions removed.
+        A client that still reports in enrolls again as a new pending device.
+      responses:
+        '204': {description: Deleted.}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: '"window_open": close the access window first.', content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/devices/{id}/policy:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    get:
+      operationId: getDevicePolicy
+      summary: Get effective policy and access window status for a visible device
+      responses:
+        '200': {description: Device policy status., content: {application/json: {schema: {$ref: '#/components/schemas/DevicePolicyStatus'}}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/devices/{id}/id-allow-list:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    get:
+      summary: Get a device's ID allow list and effective list (Owner or Admin)
+      responses:
+        '200': {description: Device list with inherited entries, content: {application/json: {schema: {$ref: '#/components/schemas/DeviceIdAllowList'}}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+    put:
+      summary: Replace a device's ID allow list (Owner or Admin)
+      description: Audited as id_allow_list.updated in the same transaction as the replacement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/IdAllowList'}
+      responses:
+        '200': {description: Device list with inherited entries, content: {application/json: {schema: {$ref: '#/components/schemas/DeviceIdAllowList'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/devices/{id}/access-window:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      operationId: openAccessWindow
+      summary: Open an access window
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [duration_minutes, disconnect_on_close]
+              additionalProperties: false
+              properties:
+                duration_minutes: {type: [integer, 'null'], enum: [60, 240, 480, null]}
+                disconnect_on_close: {type: boolean}
+      responses:
+        '201': {description: Open access window., content: {application/json: {schema: {$ref: '#/components/schemas/AccessWindow'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: '"window_open", "push_off", "always_reachable", or "bad_transition".', content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/devices/{id}/access-window/close:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      operationId: closeAccessWindow
+      summary: Close the access window
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [disconnect]
+              additionalProperties: false
+              properties:
+                disconnect: {type: boolean}
+      responses:
+        '204': {description: Closed.}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/devices/{id}/approve:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Approve a pending or rejected device
+      description: |
+        Sets approved_by and approved_at. Audited as device.approved.
+        A device without a group is placed by the group patterns (see POST /groups/{id}/rules); with two or more matching groups it stays ungrouped and gets a group_conflict alert.
+      responses: &transitionResponses
+        '200': {$ref: '#/components/responses/Device'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: '"bad_transition": the device is not in a state this action applies to.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/devices/{id}/reject:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Reject a pending device
+      description: A rejected device is ignored by the client API. Audited as device.rejected.
+      responses: *transitionResponses
+
+  /admin/api/v1/devices/{id}/reopen:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Return a rejected or approved device to pending
+      description: >-
+        The undo of a reject or an approve: the device waits for approval again, and
+        approved_by and approved_at are cleared. Audited as device.reopened, with the
+        previous state in details.from.
+      responses:
+        '200': {$ref: '#/components/responses/Device'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: '"bad_transition" or "window_open".', content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/devices/{id}/archive:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Archive an approved device
+      description: An archived device is ignored by the client API. Audited as device.archived.
+      responses:
+        '200': {$ref: '#/components/responses/Device'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: '"bad_transition" or "window_open".', content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/devices/{id}/restore:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Restore an archived device to approved
+      description: Sets approved_by and approved_at. Audited as device.restored.
+      responses: *transitionResponses
+
+  /admin/api/v1/devices/{id}/alerts/{alert_id}/resolve:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+      - {name: alert_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      summary: Resolve an open device alert
+      description: |
+        "accept_new_uuid" re-pins the device to the alert's seen_uuid, so the client
+        with that uuid is trusted from then on; "dismiss" keeps the pinned uuid.
+        Audited as device.alert_resolved.
+        For group_conflict only dismiss applies: the device stays where it is. A PATCH that sets group_id (even to the group the device is already in) also resolves it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              additionalProperties: false
+              properties:
+                action: {type: string, enum: [accept_new_uuid, dismiss]}
+      responses:
+        '200': {$ref: '#/components/responses/Device'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404':
+          description: Unknown device, or the alert is not an open alert of this device.
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/devices/{id}/connect:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    get:
+      summary: A rustdesk:// link and command for an approved device
+      description: |
+        The link is rustdesk://<id> for connect and rustdesk://<action>/<id> otherwise,
+        with /r appended when relay=1. It carries no password. Each link handed out is
+        audited as device.connect_link. Devices that are not approved are 404.
+        For a User, a device outside their grants is 404.
+      parameters:
+        - {name: action, in: query, schema: {type: string, enum: [connect, file-transfer, port-forward, terminal], default: connect}}
+        - {name: relay, in: query, schema: {type: string, enum: ['0', '1'], default: '0'}}
+      responses:
+        '200':
+          description: Link.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, command, id, includes_server]
+                additionalProperties: false
+                properties:
+                  url: {type: string, description: 'When links_include_server is on, names the ID server and its key (''+'' escaped), so it works from a client set to another ID server, e.g. rustdesk://123456789@rd.example.com?key=OeVu...='}
+                  command: {type: string, description: 'When links_include_server is on, e.g. rustdesk --connect "123456789@rd.example.com?key=OeVu...="'}
+                  id: {type: string, description: The device's rustdesk_id.}
+                  includes_server: {type: boolean, description: 'False when links_include_server is off; the link then works only from a client already set to this server and key.'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: '"access_locked": the policy locks Connect.', content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/policies:
+    get:
+      summary: List policies (Owner or Admin)
+      description: Default first, then by name; no paging.
+      responses:
+        '200':
+          description: Policies.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                additionalProperties: false
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/Policy'}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+    post:
+      summary: Create a policy (Owner or Admin)
+      description: Audited as policy.created.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, settings]
+              additionalProperties: false
+              properties:
+                name: {type: string, minLength: 1, maxLength: 100}
+                settings: {$ref: '#/components/schemas/PolicySettings'}
+      responses:
+        '201': {description: Created policy, content: {application/json: {schema: {$ref: '#/components/schemas/Policy'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {description: '"name_taken".', content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/policies/{id}:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    get:
+      summary: Get a policy (Owner or Admin)
+      responses:
+        '200': {description: Policy, content: {application/json: {schema: {$ref: '#/components/schemas/Policy'}}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+    patch:
+      summary: Update a policy (Owner or Admin)
+      description: At least one field is required; settings replaces the whole map. Audited as policy.updated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              additionalProperties: false
+              properties:
+                name: {type: string, minLength: 1, maxLength: 100}
+                settings: {$ref: '#/components/schemas/PolicySettings'}
+      responses:
+        '200': {description: Policy, content: {application/json: {schema: {$ref: '#/components/schemas/Policy'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: '"name_taken" or "default_policy".', content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '500': {$ref: '#/components/responses/Internal'}
+    delete:
+      summary: Delete a policy (Owner or Admin)
+      description: Audited as policy.deleted.
+      responses:
+        '204': {description: Deleted.}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: '"default_policy" or "in_use".', content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/settings/log-export:
+    get:
+      summary: Log export settings and per-output status (Owner or Admin)
+      responses:
+        '200': {description: Settings and status., content: {application/json: {schema: {$ref: '#/components/schemas/LogExport'}}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+    put:
+      summary: Replace the log export settings (Owner)
+      description: |
+        Replaces the settings of both outputs. An output switched on starts at that moment: events
+        written before are not sent to it. A syslog output that is on needs a host. ca_pem, when not
+        empty, must hold at least one PEM certificate. Audited as settings.log_export_updated with
+        the names of the changed fields (never the certificate text); no change, no audit entry.
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/LogExportSettings'}}}
+      responses:
+        '200': {description: Saved settings and status., content: {application/json: {schema: {$ref: '#/components/schemas/LogExport'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/settings/log-export/test:
+    post:
+      summary: Send a test event to one output (Owner)
+      description: |
+        Delivers one ferricade.test event straight to the output with the saved settings, also while
+        that output is off (10 s timeout). Not queued and not audited. A failed delivery is a
+        result (ok=false with the error), not an HTTP error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [output]
+              additionalProperties: false
+              properties:
+                output: {type: string, enum: [file, syslog]}
+      responses:
+        '200': {description: Test result., content: {application/json: {schema: {$ref: '#/components/schemas/LogExportTestResult'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/settings/sessions:
+    get:
+      summary: Get sign-in duration (Owner or Admin)
+      responses:
+        '200': {description: Sign-in duration., content: {application/json: {schema: {$ref: '#/components/schemas/SessionSettings'}, example: {lifetime: browser, updated_at: null, updated_by: null}}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+    put:
+      summary: Set sign-in duration (Owner)
+      description: |
+        Read at password or OIDC sign-in; the session stores persistence and expires_at.
+        browser (default) uses a browser-session cookie without Max-Age, ends after
+        5 minutes idle (kept alive by an open /events stream), and is capped at 7 days.
+        8h, 1d, 7d and 30d use persistent cookies with Max-Age equal to whole seconds
+        remaining until expires_at, with no idle limit. TOTP rotation preserves both
+        persistence and expires_at, setting the cookie's remaining Max-Age.
+        A stricter value (browser < 8h < 1d < 7d < 30d) caps every open session at
+        least(expires_at, created_at + duration), using 7 days for browser. Switching
+        to browser also makes sessions non-persistent and restores the idle limit.
+        This includes the owner's session, which may end immediately. A looser value
+        affects only later sign-ins. Audited as session_lifetime.changed with
+        before/after values only on change; the setting, session caps and audit are
+        committed in the same transaction. Cookie flags, CSRF, Origin checks,
+        rotation, MFA, lockout, sign-out and session revocation are unchanged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lifetime]
+              additionalProperties: false
+              properties:
+                lifetime: {type: string, enum: [browser, 8h, 1d, 7d, 30d]}
+      responses:
+        '200': {description: Sign-in duration., content: {application/json: {schema: {$ref: '#/components/schemas/SessionSettings'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/settings/id-allow-list:
+    get:
+      summary: Get the global ID allow list (Owner or Admin)
+      responses:
+        '200': {description: Global ID allow list., content: {application/json: {schema: {$ref: '#/components/schemas/IdAllowList'}}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+    put:
+      summary: Replace the global ID allow list (Owner)
+      description: Audited as id_allow_list.updated in the same transaction as the replacement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/IdAllowList'}
+      responses:
+        '200': {description: Global ID allow list., content: {application/json: {schema: {$ref: '#/components/schemas/IdAllowList'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/settings/policy-push:
+    get:
+      summary: Get policy push switch (Owner or Admin)
+      responses:
+        '200': {description: Switch, content: {application/json: {schema: {$ref: '#/components/schemas/PolicyPush'}}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+    put:
+      summary: Set policy push switch (Owner)
+      description: Audited as policy_push.enabled or policy_push.disabled on change.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              additionalProperties: false
+              properties:
+                enabled: {type: boolean}
+      responses:
+        '200': {description: Switch, content: {application/json: {schema: {$ref: '#/components/schemas/PolicyPush'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {description: '"window_open": close the open access windows first.', content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/groups/{id}/policy:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    put:
+      summary: Set a group's policy (Owner or Admin)
+      description: Audited as group.policy_changed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [policy_id]
+              additionalProperties: false
+              properties:
+                policy_id: {type: [string, 'null'], format: uuid}
+      responses:
+        '200': {$ref: '#/components/responses/Group'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/groups/{id}/id-allow-list:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    get:
+      summary: Get a group's ID allow list (Owner or Admin)
+      responses:
+        '200': {description: Group ID allow list., content: {application/json: {schema: {$ref: '#/components/schemas/IdAllowList'}}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+    put:
+      summary: Replace a group's ID allow list (Owner or Admin)
+      description: Audited as id_allow_list.updated in the same transaction as the replacement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/IdAllowList'}
+      responses:
+        '200': {description: Group ID allow list., content: {application/json: {schema: {$ref: '#/components/schemas/IdAllowList'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/group-rules:
+    get:
+      summary: Every automatic grouping pattern (Owner or Admin)
+      description: By group, then pattern. The list is returned whole; next_cursor is always "".
+      responses:
+        '200':
+          description: Rules.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                additionalProperties: false
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/GroupRule'}}
+                  next_cursor: {type: string}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/groups/{id}/rules:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Add a hostname pattern to a group (Owner or Admin)
+      description: |
+        Approving a pending or rejected device without a group puts it into the one group
+        whose patterns match its hostname (whole name, case-insensitive; * is any run of
+        characters, ? exactly one). Two or more matching groups raise a group_conflict alert.
+        At most 20 patterns per group. Audited as group.rule_added.
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/GroupRuleInput'}}}
+      responses:
+        '201': {description: The rule., content: {application/json: {schema: {$ref: '#/components/schemas/GroupRule'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: '"pattern_taken": the group already has this pattern (ignoring case).', content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/groups/{id}/rules/{rule_id}:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+      - {name: rule_id, in: path, required: true, schema: {type: string, format: uuid}}
+    delete:
+      summary: Remove a hostname pattern (Owner or Admin)
+      description: Audited as group.rule_removed. Open group_conflict alerts that list this group drop it when none of the group's remaining rules matches the device; an alert left with fewer than two groups is resolved (the device is not moved).
+      responses:
+        '204': {description: Removed.}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {description: 'Unknown group, or the rule is not one of its rules.', content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/groups/{id}/rules/preview:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Which devices a pattern would match (Owner or Admin)
+      description: Pending and approved devices only. Not saved and not audited.
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/GroupRuleInput'}}}
+      responses:
+        '200': {description: Preview., content: {application/json: {schema: {$ref: '#/components/schemas/GroupRulePreview'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/groups:
+    get:
+      summary: The group tree
+      description: >-
+        Root groups as items, each with its descendants in children, siblings by name. The tree is returned whole; next_cursor is always "". For a User: the granted groups as roots (a granted group with a granted ancestor appears only under it) with their subgroups; groups carry no device counts.
+      responses:
+        '200':
+          description: Group tree.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                additionalProperties: false
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/Group'}}
+                  next_cursor: {$ref: '#/components/schemas/NextCursor'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+    post:
+      summary: Create a group
+      description: Audited as group.created.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              additionalProperties: false
+              properties:
+                name: {type: string, minLength: 1, maxLength: 128}
+                parent_id: {type: [string, 'null'], format: uuid, description: Absent or null for a root group.}
+      responses:
+        '201': {$ref: '#/components/responses/Group'}
+        '400':
+          description: '"bad_request": malformed body, bad name, or unknown parent.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409':
+          description: '"name_taken": a sibling has this name.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/groups/{id}:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    patch:
+      summary: Rename a group
+      description: Audited as group.renamed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              additionalProperties: false
+              properties:
+                name: {type: string, minLength: 1, maxLength: 128}
+      responses:
+        '200': {$ref: '#/components/responses/Group'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: '"name_taken": a sibling has this name.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '500': {$ref: '#/components/responses/Internal'}
+    delete:
+      summary: Delete an empty group
+      description: Audited as group.deleted. Open group_conflict alerts that list this group drop it; an alert left with fewer than two groups is resolved (the device is not moved).
+      responses:
+        '204': {description: Deleted.}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: '"not_empty": the group has child groups or devices.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/groups/{id}/move:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Move a group
+      description: Audited as group.moved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [parent_id]
+              additionalProperties: false
+              properties:
+                parent_id: {type: [string, 'null'], format: uuid, description: The new parent; null makes the group a root.}
+      responses:
+        '200': {$ref: '#/components/responses/Group'}
+        '400':
+          description: '"bad_request": malformed body, missing parent_id, or unknown parent.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: '"cycle": the parent is the group itself or one of its descendants; "name_taken": a sibling under the new parent has this name.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/tags:
+    get:
+      summary: List tags
+      description: >-
+        By name, case-insensitively. For a User: only tags on their visible devices.
+      parameters:
+        - {$ref: '#/components/parameters/limit'}
+        - {$ref: '#/components/parameters/cursor'}
+      responses:
+        '200':
+          description: A page of tags.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                additionalProperties: false
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/Tag'}}
+                  next_cursor: {$ref: '#/components/schemas/NextCursor'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+    post:
+      summary: Create a tag
+      description: Audited as tag.created.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              additionalProperties: false
+              properties:
+                name: {type: string, minLength: 1, maxLength: 64}
+                color: {type: integer, format: int64, minimum: 0, maximum: 4294967295, default: 0}
+      responses:
+        '201': {$ref: '#/components/responses/Tag'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409':
+          description: '"name_taken": a tag has this name (case-insensitively).'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/tags/{id}:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    patch:
+      summary: Rename or recolor a tag
+      description: Absent fields are kept. Audited as tag.updated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: {type: string, minLength: 1, maxLength: 64}
+                color: {type: integer, format: int64, minimum: 0, maximum: 4294967295}
+      responses:
+        '200': {$ref: '#/components/responses/Tag'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: '"name_taken": another tag has this name.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '500': {$ref: '#/components/responses/Internal'}
+    delete:
+      summary: Delete a tag
+      description: The tag is detached from every device. Audited as tag.deleted.
+      responses:
+        '204': {description: Deleted.}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/users:
+    get:
+      summary: List users (Owner)
+      description: By username, case-insensitively.
+      parameters:
+        - {$ref: '#/components/parameters/limit'}
+        - {$ref: '#/components/parameters/cursor'}
+      responses:
+        '200':
+          description: A page of users.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                additionalProperties: false
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/User'}}
+                  next_cursor: {$ref: '#/components/schemas/NextCursor'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+    post:
+      summary: Create a user (Owner)
+      description: |
+        Username: 1 to 64 of letters, digits, '.', '_', '-', '@', unique
+        case-insensitively. Password: at least 12 characters, not common, not the
+        username. An owner always has totp_required. Audited as user.created.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password, role]
+              additionalProperties: false
+              properties:
+                username: {type: string}
+                password: {type: string}
+                display_name: {type: string, maxLength: 128}
+                email: {type: string, format: email}
+                role: {type: string, enum: [owner, admin, user]}
+                totp_required: {type: boolean, default: false}
+      responses:
+        '201': {$ref: '#/components/responses/User'}
+        '400':
+          description: '"bad_request", or "weak_password".'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409':
+          description: '"username_taken".'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '500': {$ref: '#/components/responses/Internal'}
+        '503': {$ref: '#/components/responses/Busy'}
+
+  /admin/api/v1/users/{id}:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    patch:
+      summary: Edit a user (Owner)
+      description: |
+        Absent fields are kept. A change that would leave no active owner (demoting or
+        disabling the last one) gives 409 "last_owner". Promotion to owner turns
+        totp_required on, and it cannot be turned off for an owner. Disabling a user
+        ends their sessions at once. Audited as user.updated with the changed fields
+        before and after.
+        Any role change of a user, or to user, deletes that account's grants (PUT /users/{id}/grants) and ends their open event streams with resync.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                display_name: {type: string, maxLength: 128}
+                email: {type: string, format: email}
+                role: {type: string, enum: [owner, admin, user]}
+                status: {type: string, enum: [active, disabled]}
+                totp_required: {type: boolean}
+      responses:
+        '200': {$ref: '#/components/responses/User'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: '"last_owner".'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/users/{id}/reset-totp:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Remove a user's TOTP (Owner)
+      description: |
+        Deletes the user's TOTP secret and ends their sessions; with totp_required they
+        must enroll again at their next sign-in. Audited as user.totp_reset.
+      responses:
+        '200': {$ref: '#/components/responses/User'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/users/{id}/password:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Set another account's password (Owner)
+      description: |
+        Sets the account's password, with the same rules as POST /users (at least 12 characters,
+        not a common password, not the username in any capitalisation; at most 1024 bytes). Ends all
+        of that account's sessions and clears its failed-sign-in lockout. TOTP is unchanged. Not for
+        the caller's own account (use POST /auth/password, which asks for the current password):
+        that gives 400 "bad_request". Audited as user.password_reset.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              additionalProperties: false
+              properties:
+                password: {type: string}
+      responses:
+        '200': {$ref: '#/components/responses/User'}
+        '400':
+          description: '"bad_request", or "weak_password".'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+        '503': {$ref: '#/components/responses/Busy'}
+
+  /admin/api/v1/users/{id}/avatar:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    get:
+      summary: A user's photo
+      description: The image copied from the OIDC provider. Cache-Control private, max-age=300; X-Content-Type-Options nosniff. A User gets only their own photo; any other is 404.
+      responses:
+        '200':
+          description: The image.
+          content:
+            image/png: {schema: {type: string, format: binary}}
+            image/jpeg: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/users/{id}/oidc:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    delete:
+      summary: Unlink a user from the OIDC provider (Owner)
+      description: |
+        Clears the link and ends the user's sessions. Audited as user.oidc_unlinked. A user with
+        no password cannot be unlinked: they could not sign in any more.
+      responses:
+        '200': {$ref: '#/components/responses/User'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: no_password; unlinking would lock the user out., content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/users/{id}/grants:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    get:
+      summary: The devices and groups granted to a User (Owner)
+      description: For a user whose role is not user, both lists are empty.
+      responses:
+        '200': {description: Grants., content: {application/json: {schema: {$ref: '#/components/schemas/UserGrants'}}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+    put:
+      summary: Replace a User's grants (Owner)
+      description: |
+        Replaces both lists. A device that is not approved may be granted; the User sees it
+        once it is approved. An unknown group or device ID gives 400 "bad_request". Audited
+        as user.grants_updated with details {added_group_ids, removed_group_ids,
+        added_device_ids, removed_device_ids}. The User's open event streams end with resync.
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/UserGrants'}}}
+      responses:
+        '200': {description: The saved grants., content: {application/json: {schema: {$ref: '#/components/schemas/UserGrants'}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: '"bad_transition": grants apply to the user role only.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/server:
+    get:
+      summary: The server profile
+      responses:
+        '200': {$ref: '#/components/responses/Server'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+    patch:
+      summary: Edit the server profile (Owner)
+      description: |
+        Absent fields are kept; the result is validated as in /setup/server (an empty
+        name becomes "default"). Run POST /server/check to test it. Audited as
+        server.updated with the changed fields before and after.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: {type: string, maxLength: 128}
+                id_host: {type: string, description: 'A DNS name, IPv4 address or IPv6 address (bracketed when a port follows), optionally with :port (1-65535).'}
+                relay_host: {type: string, description: Same form as id_host.}
+                public_key: {type: string, description: Base64 of 32 bytes (hbbs id_ed25519.pub).}
+                api_url: {type: string, description: 'Empty clears it. Otherwise https://host[:port] (port not 21114) with no path, query, fragment or user info; one trailing slash is trimmed.'}
+                links_include_server: {type: boolean}
+      responses:
+        '200': {$ref: '#/components/responses/Server'}
+        '400':
+          description: '"bad_request" (malformed body, host or api_url), or "invalid_key".'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/server/check:
+    post:
+      summary: Check the server's reachability
+      description: Dials the ID server (default port 21116), relay (21117), the client API address the clients are given (ID host, default port 21114), and runs an online query against HBBS_ADDR when set. Nothing is written to the database; the result becomes the latest round of GET /server/health.
+      responses:
+        '200':
+          description: Check results.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [checks]
+                additionalProperties: false
+                properties:
+                  checks:
+                    type: array
+                    items: {$ref: '#/components/schemas/Check'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/server/health:
+    get:
+      summary: The RustDesk server's health from the background checks
+      description: |
+        ferricade runs the checks of POST /server/check every 60 s in the background (once
+        setup is complete) and after each POST /server/check. This returns the latest
+        round without dialing anything. Every role may read it; for a User every detail
+        is empty. Not audited.
+      responses:
+        '200':
+          description: The latest round.
+          content: {application/json: {schema: {$ref: '#/components/schemas/ServerHealth'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/audit:
+    get:
+      summary: The audit log
+      description: >-
+        Newest first. For a User: only their own auth.* events and device.connect_link events; the actor filter is ignored.
+      parameters:
+        - {name: action, in: query, description: 'Exact action, e.g. device.approved.', schema: {type: string, maxLength: 256}}
+        - {name: actor, in: query, description: Actor user ID., schema: {type: string, format: uuid}}
+        - {name: target, in: query, description: Exact target_id., schema: {type: string, maxLength: 256}}
+        - {name: since, in: query, description: Inclusive., schema: {type: string, format: date-time}}
+        - {name: until, in: query, description: Exclusive., schema: {type: string, format: date-time}}
+        - {$ref: '#/components/parameters/limit'}
+        - {$ref: '#/components/parameters/cursor'}
+      responses:
+        '200':
+          description: A page of events.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                additionalProperties: false
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/AuditEvent'}}
+                  next_cursor: {$ref: '#/components/schemas/NextCursor'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/sessions:
+    get:
+      summary: Remote session history
+      description: >-
+        Newest start first. Sessions are built from the connection audits RustDesk clients
+        post. The list includes connection attempts whose peer never authenticated
+        (authed_at null); filter them with authenticated.
+        For a User: only sessions of their visible devices. For a User, client_ip is null.
+      parameters:
+        - {name: device_id, in: query, description: Only this device's sessions., schema: {type: string, format: uuid}}
+        - {name: active, in: query, description: 'true for open sessions, false for ended ones.', schema: {type: string, enum: ['true', 'false']}}
+        - {name: authenticated, in: query, description: 'true for sessions whose peer authenticated (authed_at set), false for connection attempts that never did. Absent lists both; the statistics count only authenticated sessions.', schema: {type: string, enum: ['true', 'false']}}
+        - {name: since, in: query, description: Inclusive; on started_at., schema: {type: string, format: date-time}}
+        - {name: until, in: query, description: Exclusive; on started_at., schema: {type: string, format: date-time}}
+        - {$ref: '#/components/parameters/limit'}
+        - {$ref: '#/components/parameters/cursor'}
+      responses:
+        '200':
+          description: A page of sessions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                additionalProperties: false
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/RemoteSession'}}
+                  next_cursor: {$ref: '#/components/schemas/NextCursor'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/sessions/{id}/disconnect:
+    parameters:
+      - {$ref: '#/components/parameters/id'}
+    post:
+      summary: Disconnect an open remote session
+      description: >-
+        Owner and admin. Stores the request; the device's next heartbeat reply lists the
+        connection, the stock client closes it (within a few seconds while a session is
+        open) and the session then ends with end_reason "disconnected". Answers 202 with
+        the session, whose disconnect_requested_at is set; that is the request, not proof
+        that the connection is gone. Repeating the request on an open session is idempotent:
+        202, the original disconnect_requested_at, no second audit entry. Audited as
+        session.disconnect_requested (target the session; details device_id and conn_id).
+      responses:
+        '202':
+          description: The request is stored.
+          content: {application/json: {schema: {$ref: '#/components/schemas/RemoteSession'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409':
+          description: '"session_ended": the session has already ended.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/sessions/stats:
+    get:
+      summary: Session statistics
+      description: >-
+        Authenticated sessions (authed_at set) started in the last 7 or 30 days (today
+        included), by the day they started in the requested time zone. Open sessions
+        count up to now. Connection attempts whose peer never authenticated are not counted.
+        For a User: only sessions of their visible devices.
+      parameters:
+        - {name: range, in: query, description: Default 7d., schema: {type: string, enum: [7d, 30d]}}
+        - {name: tz, in: query, description: 'IANA time zone name, e.g. America/New_York. Default UTC.', schema: {type: string, maxLength: 256}}
+      responses:
+        '200':
+          description: The statistics.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SessionStats'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/stats/history:
+    get:
+      summary: Fleet trend history
+      description: >-
+        Snapshots of device and session counts taken every five minutes, grouped into
+        buckets of step_seconds (24h: 300, 7d: 3600, 30d: 21600). approved, online and
+        pending are the rounded mean over the bucket and sessions its peak. Buckets
+        without a snapshot are left out; oldest first.
+        Not available to a User (403).
+      parameters:
+        - {name: range, in: query, required: true, schema: {type: string, enum: [24h, 7d, 30d]}}
+      responses:
+        '200':
+          description: The history.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FleetHistory'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/stats/summary:
+    get:
+      summary: Dashboard summary
+      description: >-
+        Everything the dashboard's command center shows, in one call: device counts,
+        open sessions and alerts, mixes by operating system and client version,
+        per-group counts, and the devices needing attention (using the owner's
+        thresholds from /settings/dashboard). Online state is the live state.
+        For a User: computed over their visible devices; pending counts are 0.
+      responses:
+        '200':
+          description: The summary.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FleetSummary'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/stats/fleet-map:
+    get:
+      summary: Every approved device the caller can see, compact, for the Fleet overview
+      description: |
+        At most 2000 devices, ordered by name (case-insensitive) then id; truncated is true when more exist.
+        name = alias, else hostname, else rustdesk_id. status = alert when the device has an open alert, else
+        online/offline from the online tracker. For a User: only visible devices, and group_id is null when the
+        device's group is outside their grants. Any signed-in role. Not audited.
+      responses:
+        '200':
+          description: The fleet map.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FleetMap'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/settings/dashboard:
+    get:
+      summary: Dashboard thresholds
+      description: The defaults (7 days, 24 hours, no minimum version) until the owner saves others.
+      responses:
+        '200':
+          description: The thresholds.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardThresholds'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+    put:
+      summary: Set the dashboard thresholds (Owner)
+      description: |
+        Replaces all three thresholds. Audited as settings.dashboard_updated with the
+        thresholds before and after.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DashboardThresholds'}
+      responses:
+        '200':
+          description: The saved thresholds.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardThresholds'}
+        '400':
+          description: '"bad_request": a missing field, a malformed body, or a value out of range; the message names the field.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+
+  /admin/api/v1/dashboard/catalog:
+    get:
+      summary: Dashboard module catalog and presets
+      description: |
+        The one definition of the command center's modules (in canonical order, with
+        their grid size) and presets. The UI reads it from here.
+        For a User: only modules that work on their devices (no fleet history charts, no wall display).
+      responses:
+        '200':
+          description: The catalog.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardCatalog'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+
+  /admin/api/v1/events:
+    get:
+      summary: Live event stream (server-sent events)
+      description: |
+        A `text/event-stream` that stays open until the client disconnects. It starts with
+        `retry: 3000`, then carries one message per change, written as
+        `event: <type>` and `data: <json>` where the JSON is a
+        [LiveEvent](#/components/schemas/LiveEvent) (`#/components/schemas/LiveEvent`)
+        whose `type` is the event name: IDs only, so the client refetches what it shows.
+        Types: `device.updated` (an admin change, or new sysinfo details),
+        `device.enrolled`, `device.online`, `device.offline`, `session.started`,
+        `session.updated` (the peer authenticated: peer and type are known),
+        `session.ended`, `audit.created`, `preferences.updated` (sent only to the admin
+        whose preferences changed). A `: ping` comment is sent every 25 seconds. When
+        events may have been missed (the client read too slowly, the server's event
+        listener reconnected, or the server is shutting down) the server sends
+        `event: resync` with `data: {"type":"resync"}` and ends the stream; the client
+        reconnects and refetches. At most 5 streams per session and 20 per user; excess
+        streams are refused with 429.
+        The response headers are `Cache-Control: no-store` and `X-Accel-Buffering: no`.
+      responses:
+        '200':
+          description: The event stream.
+          content:
+            text/event-stream:
+              schema: {type: string}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '429':
+          description: The per-session or per-user stream cap is already open ("rate_limited").
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+
+  /admin/api/v1/me/preferences:
+    get:
+      summary: The signed-in admin's dashboard preferences
+      description: |
+        With nothing stored, the business preset. Stored preferences are reconciled with
+        the catalog: unknown modules are dropped and modules the catalog gained are
+        appended, disabled. Pinned devices that no longer exist or are not approved are
+        dropped.
+      responses:
+        '200':
+          description: The preferences.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Preferences'}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}
+    put:
+      summary: Replace the signed-in admin's dashboard preferences
+      description: |
+        Replaces the preferences; the body is at most 16 KiB. palette may be left out to keep
+        the stored one (default for an admin who never saved preferences); toast_seconds may be
+        left out to keep its stored value. Not audited (a personal setting). Returns the preferences
+        as GET would, including toast_seconds.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PreferencesPut'}
+      responses:
+        '200':
+          description: The saved preferences, normalized.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Preferences'}
+        '400':
+          description: '"bad_request": a missing field, a malformed or oversize body, an unknown or repeated module, more than 24 or repeated pins, or a value outside its enum.'
+          content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '500': {$ref: '#/components/responses/Internal'}

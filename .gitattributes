@@ -1,0 +1,25 @@
+# Keep LF in the working tree on Windows too (core.autocrlf=true), so gofmt,
+# sqlc diff and shell scripts see the same bytes as CI.
+*.go   text eol=lf
+*.sql  text eol=lf
+*.sh   text eol=lf
+*.tmpl text eol=lf
+*.ps1  text eol=lf
+*.yaml text eol=lf
+*.yml  text eol=lf
+internal/deploy/testdata/golden/* -text
+go.mod text eol=lf
+go.sum text eol=lf
+
+# Keep local agent instructions and tooling out of public source archives.
+CLAUDE.md export-ignore
+GEMINI.md export-ignore
+Project-Lead.md export-ignore
+LICENSE.voltagent.txt export-ignore
+.claude/ export-ignore
+.github/agents/ export-ignore
+.github/skills/ export-ignore
+.github/hooks/ export-ignore
+docs/orchestration/ export-ignore
+.reports/ export-ignore
+.impeccable/ export-ignore

@@ -1,0 +1,14 @@
+{
+  "source": "derived",
+  "client_version": "1.5.0",
+  "ref": "src/hbbs_http/sync.rs start_hbbs_sync_async",
+  "method": "POST",
+  "path": "/api/heartbeat",
+  "body": {
+    "id": "123456789",
+    "uuid": "ZmFrZS11dWlk",
+    "ver": 1005000,
+    "modified_at": 0
+  },
+  "response": {}
+}

@@ -1,0 +1,89 @@
+/* Brand logo tokens and rules (Ferricade brand kit).
+   Ink follows each palette's --brand-ink token.
+   Rust and oxide values stay pinned to the brand hexes for light and dark grounds. */
+
+:root,
+[data-theme='light'] {
+  --fc-brand-rust: #b7410e;
+  --fc-brand-oxide-rim: #56200b;
+  --fc-brand-oxide-face: #9e3a11;
+  --fc-brand-oxide-warm: #be4e1a;
+  --fc-brand-oxide-bright: #d66c2e;
+  --fc-brand-oxide-dark: #762a0d;
+  --fc-brand-oxide-pit: #3e1608;
+  --fc-brand-oxide-flake: #8c3410;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --fc-brand-rust: #d65c26;
+    --fc-brand-oxide-rim: #843210;
+    --fc-brand-oxide-face: #b04214;
+    --fc-brand-oxide-warm: #cc5820;
+    --fc-brand-oxide-bright: #e27838;
+    --fc-brand-oxide-dark: #802e0e;
+    --fc-brand-oxide-pit: #461a09;
+    --fc-brand-oxide-flake: #aa4014;
+  }
+}
+
+[data-theme='dark'] {
+  --fc-brand-rust: #d65c26;
+  --fc-brand-oxide-rim: #843210;
+  --fc-brand-oxide-face: #b04214;
+  --fc-brand-oxide-warm: #cc5820;
+  --fc-brand-oxide-bright: #e27838;
+  --fc-brand-oxide-dark: #802e0e;
+  --fc-brand-oxide-pit: #461a09;
+  --fc-brand-oxide-flake: #aa4014;
+}
+
+.fc-logo-ink {
+  fill: var(--brand-ink);
+}
+
+.fc-logo-rust {
+  fill: var(--fc-brand-rust);
+}
+
+.fc-oxide-rim {
+  fill: var(--fc-brand-oxide-rim);
+}
+
+.fc-oxide-face {
+  fill: var(--fc-brand-oxide-face);
+}
+
+.fc-oxide-warm {
+  fill: var(--fc-brand-oxide-warm);
+}
+
+.fc-oxide-bright {
+  fill: var(--fc-brand-oxide-bright);
+}
+
+.fc-oxide-dark {
+  fill: var(--fc-brand-oxide-dark);
+}
+
+.fc-oxide-pit {
+  fill: var(--fc-brand-oxide-pit);
+}
+
+.fc-oxide-flake {
+  fill: var(--fc-brand-oxide-flake);
+}
+
+.fc-logo-flat-fallback {
+  display: none;
+}
+
+@media (max-width: 359px) {
+  .fc-logo-rust-detail {
+    display: none;
+  }
+
+  .fc-logo-flat-fallback {
+    display: inline;
+  }
+}

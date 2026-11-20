@@ -1,0 +1,29 @@
+# Add this file when this deployment also runs hbbs and hbbr.
+# Set HBBS_ADDR=hbbs:21115 in .env so ferricade can query online status.
+services:
+  hbbs:
+    image: rustdesk/rustdesk-server:1.1.16
+    command: hbbs -r ${RELAY_HOST:?set RELAY_HOST to the address clients reach hbbr at}:21117 -k _
+    ports:
+      - "21115:21115"     # NAT test and online query
+      - "21116:21116"     # ID / rendezvous
+      - "21116:21116/udp"
+    volumes:
+      - rustdesk-data:/root
+    restart: unless-stopped
+    logging: &logging
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  hbbr:
+    image: rustdesk/rustdesk-server:1.1.16
+    command: hbbr -k _
+    ports:
+      - "21117:21117"
+    volumes:
+      - rustdesk-data:/root
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  rustdesk-data:
