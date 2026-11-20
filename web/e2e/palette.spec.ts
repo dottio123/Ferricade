@@ -357,6 +357,12 @@ test.describe('Command palette features', () => {
     test.use({ allowConsoleErrors: [/status of 500/i] })
 
     test('keeps palette open and displays error when connect fails', async ({ page }) => {
+      const completedPolicyRequests = new Set<string>()
+      page.on('requestfinished', (request) => {
+        const match = new URL(request.url()).pathname.match(/\/devices\/([^/]+)\/policy$/)
+        if (match?.[1]) completedPolicyRequests.add(match[1])
+      })
+
       // Navigate with ?mock-fail=connectDevice
       await page.goto('/?mock-fail=connectDevice')
       await expect(page.getByRole('heading', { level: 1, name: 'Command Center' })).toBeVisible()
@@ -377,6 +383,10 @@ test.describe('Command palette features', () => {
 
       // Plain Enter on approved device triggers connect
       await page.keyboard.press('ArrowDown')
+      const selectedItem = palette.locator('[data-slot="command-item"][data-selected="true"]')
+      const deviceId = await selectedItem.getAttribute('data-device-id')
+      expect(deviceId).toBeTruthy()
+      await expect.poll(() => completedPolicyRequests.has(deviceId ?? '')).toBe(true)
       await page.keyboard.press('Enter')
 
       // Palette stays open and error is shown
