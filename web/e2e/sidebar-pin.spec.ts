@@ -13,10 +13,11 @@ test('auto sidebar expands over content, collapses on leave, and remembers pinni
   })
   await page.goto('/devices')
   await expect(page.getByRole('heading', { level: 1, name: 'Devices' })).toBeVisible()
+  await page.mouse.move(500, 500)
   const main = page.locator('#main-content')
   const before = await main.boundingBox()
   const sidebar = page.locator('aside')
-  await page.mouse.move(20, 120)
+  await page.locator('aside').hover()
   await expect(page.getByRole('button', { name: 'Pin sidebar' })).toBeVisible({ timeout: 1000 })
   const during = await main.boundingBox()
   expect(during?.x).toBe(before?.x)
@@ -56,7 +57,7 @@ test('captures sidebar modes in light and dark themes', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'Pin sidebar' })).toBeHidden()
     await page.screenshot({ path: resolve(directory, `sidebar-collapsed-${theme}.png`) })
 
-    await page.mouse.move(20, 120)
+    await page.locator('aside').hover()
     await expect(page.getByRole('button', { name: 'Pin sidebar' })).toBeVisible()
     await page.screenshot({ path: resolve(directory, `sidebar-expanded-${theme}.png`) })
     await page.evaluate(() => localStorage.setItem('ferricade.sidebar.pinned', 'true'))
@@ -74,7 +75,8 @@ test('unpinned hover shows bottom items visible and clickable', async ({ page })
   await page.goto('/devices')
   await expect(page.getByRole('heading', { level: 1, name: 'Devices' })).toBeVisible()
 
-  await page.mouse.move(20, 120)
+  await page.mouse.move(500, 500)
+  await page.locator('aside').hover()
   await expect(page.getByRole('button', { name: 'Pin sidebar' })).toBeVisible()
 
   const about = page.locator('aside').getByRole('button', { name: 'About' })
@@ -98,7 +100,7 @@ test('unpinned hover shows bottom items visible and clickable', async ({ page })
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
 
-  await page.mouse.move(20, 120)
+  await page.locator('aside').hover()
   await expect(page.getByRole('button', { name: 'Pin sidebar' })).toBeVisible()
   await settings.click()
   await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible()
@@ -118,7 +120,7 @@ test('pointer leave closes after unpin and nav click, while nav click keeps hove
   await expect(page.getByRole('button', { name: 'Pin sidebar' })).toBeHidden({ timeout: 1000 })
 
   // Hover to expand, click a nav link: stays open while hovered, then closes on pointer leave
-  await page.mouse.move(20, 120)
+  await page.locator('aside').hover()
   await expect(page.getByRole('button', { name: 'Pin sidebar' })).toBeVisible()
   await page
     .locator('aside')
@@ -175,11 +177,12 @@ test('reduced motion still opens and closes unpinned sidebar without width slide
   await page.goto('/devices')
   await expect(page.getByRole('heading', { level: 1, name: 'Devices' })).toBeVisible()
 
+  await page.mouse.move(500, 500)
   const panel = page.locator('[data-slot="sidebar-panel"]')
   const reducedTransition = await panel.evaluate((el) => getComputedStyle(el).transitionProperty)
   expect(reducedTransition).toBe('none')
 
-  await page.mouse.move(20, 120)
+  await page.locator('aside').hover()
   await expect(page.getByRole('button', { name: 'Pin sidebar' })).toBeVisible()
   expect((await panel.boundingBox())?.width).toBe(240)
   await page.mouse.move(500, 500)
