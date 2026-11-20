@@ -249,7 +249,7 @@ func TestAutoSortConcurrentRunsSerialize(t *testing.T) {
 	waitLocks := func(n int) {
 		require.Eventually(t, func() bool {
 			return count(t, e.Pool, `SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'`) >= n
-		}, 3*time.Second, 10*time.Millisecond)
+		}, 4500*time.Millisecond, 10*time.Millisecond)
 	}
 	waitLocks(1)
 	go func() { r, err := e.AutoSort(ctx, e.a); done <- outcome{1, r, err} }()

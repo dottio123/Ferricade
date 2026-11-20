@@ -162,6 +162,12 @@ test.describe('Command palette features', () => {
   test('Enter on an approved device triggers connect and opens rustdesk:// link', async ({
     page,
   }) => {
+    const completedPolicyRequests = new Set<string>()
+    page.on('requestfinished', (request) => {
+      const match = new URL(request.url()).pathname.match(/\/devices\/([^/]+)\/policy$/)
+      if (match?.[1]) completedPolicyRequests.add(match[1])
+    })
+
     await page.goto('/')
     await expect(page.getByRole('heading', { level: 1, name: 'Command Center' })).toBeVisible()
 
@@ -193,6 +199,7 @@ test.describe('Command palette features', () => {
     const selectedItem = palette.locator('[data-slot="command-item"][data-selected="true"]')
     const deviceId = await selectedItem.getAttribute('data-device-id')
     expect(deviceId).toBeTruthy()
+    await expect.poll(() => completedPolicyRequests.has(deviceId ?? '')).toBe(true)
 
     // Plain Enter on approved device triggers connect
     const connectReqPromise = page.waitForRequest((req) =>
